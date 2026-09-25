@@ -76,12 +76,12 @@ impl Common {
     fn options(&self) -> ServiceOptions {
         ServiceOptions {
             data_dir: self.data_dir.clone(),
-            settings: Settings {
+            settings: Some(Settings {
                 connections_per_download: self.connections.max(1),
                 max_active_downloads: self.parallel.max(1),
                 speed_limit_bps: self.limit,
                 ..Settings::default()
-            },
+            }),
         }
     }
 }

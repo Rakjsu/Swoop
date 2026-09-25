@@ -5,7 +5,7 @@ use crate::packages;
 fn setup() -> (Connection, PackageId) {
     let mut c = Connection::open_in_memory().unwrap();
     crate::migrations::run(&mut c).unwrap();
-    let pkg = packages::insert(&c, "p", Path::new("/tmp")).unwrap();
+    let pkg = packages::insert(&c, "p", Path::new("/tmp"), false).unwrap();
     (c, pkg)
 }
 

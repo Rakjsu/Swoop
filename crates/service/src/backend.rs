@@ -5,8 +5,11 @@
 use crate::{Service, ServiceError};
 use async_trait::async_trait;
 use std::path::PathBuf;
-use swoop_api::{ApiError, Backend, Command, DownloadView, Reply, Subscription};
-use swoop_core::DownloadId;
+use swoop_api::{
+    ApiError, Backend, Command, DownloadView, HistoryOutcome, HistoryView, Reply, Subscription,
+};
+use swoop_core::{DownloadId, Settings};
+use swoop_store::history::HistoryRow;
 use swoop_store::{DownloadRow, StoreError};
 
 /// Nome dos pacotes criados pela janela (o agrupamento real vem na fase 3).
@@ -32,13 +35,23 @@ impl Backend for Service {
             Command::Remove { id, delete_file } => self.spawn_remove(DownloadId(id), delete_file),
             Command::PauseAll => engine.pause_all().await.map_err(store)?,
             Command::ResumeAll => engine.resume_all().await.map_err(store)?,
-            Command::SetSpeedLimit { bps } => engine.set_speed_limit(bps.filter(|b| *b > 0)),
+            Command::SetSpeedLimit { bps } => self.set_speed_limit(bps).await?,
+            Command::SaveSettings { settings } => self.save_settings(settings).await?,
         }
         Ok(Reply::Done)
     }
 
     async fn list(&self) -> Result<Vec<DownloadView>, ApiError> {
         Ok(self.rows().await?.into_iter().map(view).collect())
+    }
+
+    async fn history(&self, limit: u32) -> Result<Vec<HistoryView>, ApiError> {
+        let rows = Service::history(self, limit.clamp(1, 1000)).await?;
+        Ok(rows.into_iter().map(history_view).collect())
+    }
+
+    async fn settings(&self) -> Result<Settings, ApiError> {
+        Ok(Service::settings(self))
     }
 
     fn subscribe(&self) -> Subscription {
@@ -78,6 +91,26 @@ fn view(r: DownloadRow) -> DownloadView {
     }
 }
 
+/// Entrada do histórico → linha da interface.
+fn history_view(r: HistoryRow) -> HistoryView {
+    let outcome = match r.outcome.as_str() {
+        "completed" => HistoryOutcome::Completed,
+        "removed" => HistoryOutcome::Removed,
+        _ => HistoryOutcome::Failed,
+    };
+    HistoryView {
+        id: r.id,
+        url: r.url,
+        file_name: r.file_name,
+        size: r.size,
+        final_path: r.final_path.map(|p| p.to_string_lossy().into_owned()),
+        outcome,
+        error: r.error_msg,
+        finished_ms: r.finished_at,
+        avg_bps: r.avg_bps,
+    }
+}
+
 /// Erro do banco/motor → erro para a interface.
 fn store(e: StoreError) -> ApiError {
     ServiceError::Store(e).into()
@@ -86,7 +119,9 @@ fn store(e: StoreError) -> ApiError {
 impl From<ServiceError> for ApiError {
     fn from(e: ServiceError) -> Self {
         match e {
-            ServiceError::BadLink(_) => ApiError::Invalid(e.to_string()),
+            ServiceError::BadLink(_) | ServiceError::BadSettings(_) => {
+                ApiError::Invalid(e.to_string())
+            }
             ServiceError::Store(StoreError::NotFound(id)) => {
                 ApiError::Invalid(format!("o download {id} não está mais na lista"))
             }

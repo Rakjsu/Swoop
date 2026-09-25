@@ -4,7 +4,6 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use swoop_api::ApiError;
-use swoop_core::Settings;
 use swoop_service::{Service, ServiceOptions};
 use tauri::async_runtime::JoinHandle;
 use tauri::{AppHandle, Manager};
@@ -34,9 +33,10 @@ impl EngineState {
 pub fn open(app: &AppHandle) -> EngineState {
     let data_dir =
         swoop_service::data_dir_from_env().or_else(|| app.path().app_local_data_dir().ok());
+    // Preferências salvas no banco (a tela de Opções grava lá).
     let opts = ServiceOptions {
         data_dir,
-        settings: Settings::default(),
+        settings: None,
     };
     let service = tauri::async_runtime::block_on(Service::open(opts))
         .map(Arc::new)

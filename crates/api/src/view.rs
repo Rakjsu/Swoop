@@ -46,7 +46,8 @@ pub struct Snapshot {
 }
 
 /// O que o backend empurra para a interface.
-/// No JSON: `{ "type": "snapshot", "seq": …, … }` ou `{ "type": "changed" }`.
+/// No JSON: `{ "type": "snapshot", "seq": …, … }`, `{ "type": "changed" }` ou
+/// `{ "type": "notice", "kind": "queue_finished", … }`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[ts(export)]
@@ -54,6 +55,46 @@ pub enum Push {
     Snapshot(Snapshot),
     /// A fila mudou (estado, item novo ou removido): recarregar a lista.
     Changed,
+    /// Algo que merece um aviso do sistema.
+    Notice(Notice),
+}
+
+/// Avisos para o usuário (o app desktop vira notificação do Windows).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[ts(export)]
+pub enum Notice {
+    /// Nada mais baixando nem esperando; contagem desde o último aviso.
+    QueueFinished { completed: u32, failed: u32 },
+    /// Um download falhou de vez (esgotou as tentativas ou erro sem volta).
+    Failed { name: String, message: String },
+}
+
+/// Como um item saiu da fila.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum HistoryOutcome {
+    Completed,
+    Failed,
+    Removed,
+}
+
+/// Uma entrada do histórico (o mais novo primeiro).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+pub struct HistoryView {
+    pub id: i64,
+    pub url: String,
+    pub file_name: Option<String>,
+    pub size: Option<u64>,
+    pub final_path: Option<String>,
+    pub outcome: HistoryOutcome,
+    pub error: Option<String>,
+    /// Quando saiu da fila (ms Unix).
+    pub finished_ms: i64,
+    /// Velocidade média em bytes/s.
+    pub avg_bps: Option<u64>,
 }
 
 #[cfg(test)]
@@ -73,6 +114,14 @@ mod tests {
         assert_eq!(
             serde_json::to_value(Push::Changed).unwrap(),
             json!({ "type": "changed" })
+        );
+        assert_eq!(
+            serde_json::to_value(Push::Notice(Notice::QueueFinished {
+                completed: 2,
+                failed: 0
+            }))
+            .unwrap(),
+            json!({ "type": "notice", "kind": "queue_finished", "completed": 2, "failed": 0 })
         );
     }
 

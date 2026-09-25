@@ -17,3 +17,6 @@ ts-rs = { workspace = true, optional = true }
 [features]
 # Gera os tipos TypeScript de `DownloadState` (ligada pelo swoop-api).
 ts = ["dep:ts-rs"]
+
+[dev-dependencies]
+serde_json.workspace = true

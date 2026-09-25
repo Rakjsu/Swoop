@@ -28,7 +28,7 @@ impl Harness {
         let store = Store::open(&dir.path().join("swoop.sqlite")).unwrap();
         let dest = dir.path().join("downloads");
         let pkg = store
-            .call(move |c| packages::insert(c, "teste", &dest))
+            .call(move |c| packages::insert(c, "teste", &dest, false))
             .await
             .unwrap();
         let engine = start_engine(store.clone(), settings);
