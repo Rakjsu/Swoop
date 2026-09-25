@@ -5,7 +5,7 @@ use crate::direct::{self, DirectResolver};
 use crate::dump::Dump;
 use crate::plugin::{FileInfo, HostCtx, HostPlugin};
 use crate::rules::Rules;
-use crate::{detect, gdrive, mediafire, pixeldrain};
+use crate::{detect, gdrive, mediafire, pixeldrain, xfs};
 use async_trait::async_trait;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -27,15 +27,12 @@ pub struct Registry {
 impl Registry {
     /// Registro com todos os plugins e as regras dadas.
     pub fn new(rules: Rules) -> Result<Self, reqwest::Error> {
-        let http = swoop_net::page_client(&rules.user_agent)?;
-        Ok(Self::with_client(http, rules))
-    }
-
-    /// Mesmo, com um cliente de páginas já pronto (testes).
-    pub fn with_client(http: reqwest::Client, rules: Rules) -> Self {
-        Self {
+        let jar = Arc::new(reqwest::cookie::Jar::default());
+        let http = swoop_net::page_client(&rules.user_agent, jar.clone())?;
+        Ok(Self {
             ctx: HostCtx {
                 http,
+                jar,
                 rules: Arc::new(rules),
                 dump: None,
             },
@@ -43,8 +40,9 @@ impl Registry {
                 Box::new(pixeldrain::Pixeldrain),
                 Box::new(mediafire::Mediafire),
                 Box::new(gdrive::Gdrive),
+                Box::new(xfs::Xfs),
             ],
-        }
+        })
     }
 
     /// Grava em `dir` cada resposta que os plugins lerem (fixtures).
@@ -70,7 +68,7 @@ impl Registry {
     /// domínio (a mesma que o `Resolved::direct` usa).
     pub fn host_key(&self, url: &Url) -> String {
         match self.plugin_for(url) {
-            Some(p) => p.id().to_owned(),
+            Some(p) => p.host_key(url),
             None => url.host_str().unwrap_or(DIRECT).to_ascii_lowercase(),
         }
     }
@@ -78,11 +76,16 @@ impl Registry {
     /// Links num texto qualquer.
     pub fn detect(&self, text: &str) -> Vec<Url> {
         let r = &self.ctx.rules;
-        let hosts: Vec<&str> = [&r.pixeldrain.hosts, &r.mediafire.hosts, &r.gdrive.hosts]
-            .into_iter()
-            .flatten()
-            .map(String::as_str)
-            .collect();
+        let hosts: Vec<&str> = [
+            &r.pixeldrain.hosts,
+            &r.mediafire.hosts,
+            &r.gdrive.hosts,
+            &r.xfs.hosts,
+        ]
+        .into_iter()
+        .flatten()
+        .map(String::as_str)
+        .collect();
         detect::detect(text, &hosts)
     }
 
@@ -107,7 +110,7 @@ impl Registry {
 impl Resolver for Registry {
     async fn resolve(&self, req: &ResolveRequest) -> Result<Resolved, HostError> {
         match self.plugin_for(&req.url) {
-            Some(p) => p.resolve(&self.ctx, &req.url, req.attempt).await,
+            Some(p) => p.resolve(&self.ctx, req).await,
             None => DirectResolver.resolve(req).await,
         }
     }

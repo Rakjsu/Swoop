@@ -4,14 +4,17 @@
 //! If-Range, mais botões de falha (ver `knobs`). `/stats` expõe picos de
 //! conexões e downloads; `POST /admin/generation/{n}` "troca" todos os
 //! arquivos (novo conteúdo e novo ETag), para testar arquivo mudado no servidor.
+//! `/{code}` é um XFileSharing falso (download grátis com contador e captcha).
 
 pub mod content;
 mod file;
 pub mod knobs;
 pub mod stats;
+pub mod xfs;
 
 pub use content::{effective_seed, fill, sha256_hex};
 pub use stats::Stats;
+pub use xfs::XfsStats;
 
 use axum::Router;
 use axum::extract::{Path, State};
@@ -41,6 +44,7 @@ impl TestServer {
             counters: stats::Counters::default(),
             generation: Arc::new(AtomicU64::new(0)),
             requests: Arc::new(AtomicU64::new(0)),
+            xfs: xfs::XfsState::default(),
         };
         let app = router(shared.clone());
         let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -68,6 +72,17 @@ impl TestServer {
     /// URL de um arquivo com os botões em `query` (ex.: `"size=1048576&rate=65536"`).
     pub fn file_url(&self, name: &str, query: &str) -> String {
         format!("http://{}/file/{name}?{query}", self.addr)
+    }
+
+    /// Página de um arquivo no XFileSharing falso (`code` com 12 letras ou
+    /// números, botões em `query`).
+    pub fn xfs_url(&self, code: &str, query: &str) -> String {
+        format!("http://{}/{code}?{query}", self.addr)
+    }
+
+    /// O que o XFileSharing falso viu.
+    pub fn xfs_stats(&self) -> XfsStats {
+        self.shared.xfs.stats()
     }
 
     /// Contadores atuais.
@@ -103,6 +118,7 @@ impl Drop for TestServer {
 fn router(shared: Shared) -> Router {
     Router::new()
         .route("/file/{name}", get(file::serve))
+        .route("/{code}", get(xfs::page).post(xfs::form))
         .route("/stats", get(stats_json))
         .route("/admin/generation/{n}", post(set_generation))
         .route("/admin/reset", post(reset))

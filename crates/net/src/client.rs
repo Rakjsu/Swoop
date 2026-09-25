@@ -7,6 +7,8 @@
 //! - TLS via rustls com o provedor `ring` (sem aws-lc, que exige NASM no Windows)
 //!   e certificados do sistema (rustls-platform-verifier).
 
+use reqwest::cookie::Jar;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// User-Agent padrão para links diretos. Plugins que imitam o navegador
@@ -22,13 +24,14 @@ pub fn install_crypto_provider() {
 }
 
 /// Cliente para as páginas e APIs dos servidores (plugins): cookies da
-/// sessão (alguns fluxos dependem deles), UA de navegador e tempo total
-/// limitado, porque uma página nunca é grande.
-pub fn page_client(user_agent: &str) -> Result<reqwest::Client, reqwest::Error> {
+/// sessão no `jar` (alguns fluxos dependem deles, e o plugin pode repassá-los
+/// ao motor), UA de navegador e tempo total limitado, porque uma página nunca
+/// é grande.
+pub fn page_client(user_agent: &str, jar: Arc<Jar>) -> Result<reqwest::Client, reqwest::Error> {
     install_crypto_provider();
     reqwest::Client::builder()
         .user_agent(user_agent)
-        .cookie_store(true)
+        .cookie_provider(jar)
         .connect_timeout(Duration::from_secs(15))
         .timeout(Duration::from_secs(30))
         .build()

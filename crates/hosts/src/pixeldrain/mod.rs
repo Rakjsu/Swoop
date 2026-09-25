@@ -8,7 +8,7 @@ use crate::plugin::{FileInfo, HostCtx, HostPlugin};
 use crate::rules::Rules;
 use async_trait::async_trait;
 use parse::Target;
-use swoop_core::{HostError, Integrity, RangeStyle, Resolved};
+use swoop_core::{HostError, Integrity, RangeStyle, ResolveRequest, Resolved};
 use url::Url;
 
 pub struct Pixeldrain;
@@ -57,12 +57,8 @@ impl HostPlugin for Pixeldrain {
         }
     }
 
-    async fn resolve(
-        &self,
-        ctx: &HostCtx,
-        url: &Url,
-        _attempt: u32,
-    ) -> Result<Resolved, HostError> {
+    async fn resolve(&self, ctx: &HostCtx, req: &ResolveRequest) -> Result<Resolved, HostError> {
+        let url = &req.url;
         let Target::File(id) = Self::target(ctx, url)? else {
             return Err(HostError::Changed(
                 "é uma lista do Pixeldrain: adicione de novo para abrir os arquivos".into(),

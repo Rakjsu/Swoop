@@ -22,6 +22,10 @@ pub enum CaptchaKind {
     Image {
         url: Url,
     },
+    /// Código desenhado com HTML (dígitos posicionados do XFileSharing).
+    Html {
+        html: String,
+    },
 }
 
 /// O que é preciso para mostrar o captcha e depois enviar a resposta.

@@ -21,6 +21,7 @@ mod pixeldrain;
 mod plugin;
 mod registry;
 pub mod rules;
+mod xfs;
 
 pub use direct::DirectResolver;
 pub use plugin::{FileInfo, HostCtx, HostPlugin};

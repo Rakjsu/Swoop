@@ -25,6 +25,29 @@ pub struct Page {
 /// GET simples pelo cliente de páginas.
 pub async fn get(ctx: &HostCtx, url: &Url) -> Result<Page, HostError> {
     let res = ctx.http.get(url.clone()).send().await.map_err(network)?;
+    into_page(ctx, res).await
+}
+
+/// POST de formulário pelo cliente de páginas. Se a resposta for o próprio
+/// arquivo (redirecionamento para o link direto), `url` já é o link.
+pub async fn post_form(
+    ctx: &HostCtx,
+    url: &Url,
+    fields: &[(String, String)],
+) -> Result<Page, HostError> {
+    let res = ctx
+        .http
+        .post(url.clone())
+        .header(header::REFERER, url.as_str())
+        .form(fields)
+        .send()
+        .await
+        .map_err(network)?;
+    into_page(ctx, res).await
+}
+
+/// Lê a resposta: arquivo (sem ler o corpo) ou página (até `MAX_PAGE`).
+async fn into_page(ctx: &HostCtx, res: Response) -> Result<Page, HostError> {
     let status = res.status().as_u16();
     let url = res.url().clone();
     if is_file(res.headers()) {

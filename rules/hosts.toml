@@ -48,3 +48,33 @@ missing_markers = ["file you have requested does not exist", "arquivo solicitado
 # "Muitos usuários": o Drive não diz até quando; tentar de novo depois disso.
 quota_wait_minutes = 60
 max_connections = 4
+
+[xfs]
+# Sites XFileSharing Pro. Os outros além do fastfile.cc seguem o mesmo
+# modelo; confirmar com capturas reais (swoop-cli resolve --dump-fixtures).
+hosts = ["fastfile.cc", "katfile.com", "ddownload.com"]
+# Código do arquivo: 12 letras minúsculas ou números.
+code_pattern = "^[a-z0-9]{12}$"
+download1_op = "download1"
+download2_op = "download2"
+free_field = "method_free"
+free_value = "Free Download"
+# Contador da página do download grátis (segundos).
+countdown_selector = "span.seconds, span#countdown span, #countdown_str span"
+max_countdown_secs = 600
+# Espera entre downloads (grupos: horas, minutos, segundos).
+wait_pattern = "(?:you have to wait|please wait|wait)\\s+(?:(\\d+)\\s*hours?,?\\s*)?(?:(\\d+)\\s*minutes?,?\\s*)?(?:(\\d+)\\s*seconds?)?\\s*(?:till|until|before) (?:the )?next download"
+size_pattern = "\\((\\d+(?:[.,]\\d+)?\\s*[KMGT]?B)\\)"
+# Textos (em minúsculas) que identificam cada situação.
+premium_markers = ["available for premium users only", "only premium users can download", "premium members only"]
+offline_markers = ["file not found", "no such file", "file was removed", "file has been removed", "the file you were looking for could not be found"]
+wrong_captcha_markers = ["wrong captcha"]
+skipped_countdown_markers = ["skipped countdown"]
+cloudflare_markers = ["cf-browser-verification", "challenge-platform", "just a moment..."]
+# Link final na página depois do formulário (quando não vem redirecionamento).
+direct_link_selector = "span#direct_link a[href], a#downloadbtn[href], a.btn-download[href]"
+# Captcha próprio do site: imagem ou dígitos posicionados.
+image_captcha_selector = "img[src*='/captchas/']"
+digits_captcha_selector = "td[align=right] > div[style*='padding-left'], div.captcha_code"
+free_connections = 1
+free_resumable = false
