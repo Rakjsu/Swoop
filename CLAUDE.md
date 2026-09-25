@@ -19,6 +19,15 @@ fases com portões está em `docs/specs/2026-09-25-swoop-design.md`: ler antes d
 - **Checagem para Windows sem Windows:** `rustup target add x86_64-pc-windows-gnu`, `apt install gcc-mingw-w64-x86-64`, depois `cargo clippy --target x86_64-pc-windows-gnu --all-targets -- -D warnings`
 - **Linux sem display (nuvem):** `xvfb-run -a ./target/release/swoop`. Print com `import -window root x.png`.
 
+## Publicar versão
+- Subir `version` em `[workspace.package]` do `Cargo.toml`, fazer o merge na `main` e rodar `git tag vX.Y.Z && git push origin vX.Y.Z`. O workflow **Release** roda `scripts/build-release.ps1` no Windows e publica a release. A tag tem que bater com a versão.
+- **Contrato com `crates/update`, não renomear:** `Swoop_<versão>_x64-setup.exe` e `SHA256SUMS.txt`. A atualização só aceita URLs de `github.com/Rakjsu/Swoop/releases/download/`.
+- **Parâmetros do setup NSIS:**
+  - o atualizador roda `/P /UPDATE /R` (passivo, sem recriar atalhos, reabre o app como usuário comum);
+  - o instalador personalizado roda `/S /D=<pasta>`, com `/D=` por último e sem aspas.
+- **Atualização em dev:** fica desligada; liga com `SWOOP_UPDATE_CHECK=1`, e `SWOOP_NO_UPDATE=1` desliga em qualquer build.
+- **Instalador personalizado sem `SWOOP_SETUP_PAYLOAD`:** abre a janela, mas recusa instalar ("build de desenvolvimento").
+
 ## Convenções
 - Código e comentários em português, identificadores em inglês.
 - Cada crate tem UMA responsabilidade e testa sozinho. Parsers de servidor são puros (`parse.rs`) e testados com fixtures; o I/O fica em `mod.rs`.

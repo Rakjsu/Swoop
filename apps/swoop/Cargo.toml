@@ -16,9 +16,15 @@ tauri-build.workspace = true
 [dependencies]
 swoop-core.workspace = true
 swoop-api.workspace = true
+swoop-net.workspace = true
+swoop-update.workspace = true
 tauri.workspace = true
 tauri-plugin-single-instance.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true

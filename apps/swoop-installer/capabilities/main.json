@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Janela do instalador: controles da janela sem borda e os comandos da instalação.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-minimize",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+    "allow-installer-info",
+    "allow-choose-dir",
+    "allow-start-install",
+    "allow-launch-app"
+  ]
+}

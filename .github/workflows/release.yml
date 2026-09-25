@@ -1,0 +1,44 @@
+name: Release
+
+# Publica uma versão: `git tag v0.1.0 && git push origin v0.1.0`.
+# A tag precisa bater com `version` do Cargo.toml. A release fica pública na
+# hora, e os apps instalados passam a oferecer a atualização.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: tag = versão do Cargo.toml
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches.Groups[1].Value
+          if ("v$version" -ne "${{ github.ref_name }}") {
+            throw "tag ${{ github.ref_name }} diferente da versão $version do Cargo.toml"
+          }
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: build (setup NSIS + instalador personalizado + hashes)
+        shell: pwsh
+        run: ./scripts/build-release.ps1
+      - name: publicar a release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $files = Get-ChildItem dist -File | ForEach-Object { $_.FullName }
+          gh release create "${{ github.ref_name }}" $files `
+            --title "Swoop ${{ github.ref_name }}" `
+            --generate-notes

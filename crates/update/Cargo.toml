@@ -1,0 +1,21 @@
+[package]
+name = "swoop-update"
+description = "Atualização do Swoop pelas Releases do GitHub: consulta, download e conferência do sha256"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+swoop-net.workspace = true
+futures-util.workspace = true
+hex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+swoop-testsrv.workspace = true
+tempfile.workspace = true

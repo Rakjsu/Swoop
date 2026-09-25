@@ -42,7 +42,7 @@ jobs:
             exit 1
           fi
 
-  # UI (lint + tipos + build) e o app Tauri, que exige ui/dist para compilar.
+  # UI (lint + tipos + build), o app Tauri (exige ui/dist) e o instalador.
   desktop:
     runs-on: ubuntu-latest
     steps:
@@ -69,5 +69,29 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - name: clippy do app desktop
-        run: cargo clippy -p swoop --all-targets -- -D warnings
+      - name: clippy do app desktop e do instalador
+        run: cargo clippy -p swoop -p swoop-installer --all-targets -- -D warnings
+      - name: testes do instalador
+        run: cargo test -p swoop-installer
+
+  # Gera o instalador de verdade (NSIS + personalizado) como artefato: é o
+  # mesmo script da release, validado antes de publicar qualquer versão.
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: build (setup NSIS + instalador personalizado + hashes)
+        shell: pwsh
+        run: ./scripts/build-release.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: swoop-instaladores
+          path: dist/
+          retention-days: 7

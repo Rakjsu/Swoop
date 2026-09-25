@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Instalação do Swoop</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Barra de título própria (a janela não tem borda) -->
+    <header class="title-bar" data-tauri-drag-region>
+      <div class="title-bar-logo" data-tauri-drag-region>
+        <svg width="18" height="18" viewBox="0 0 100 100" aria-hidden="true">
+          <defs>
+            <linearGradient id="tbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#38bdf8" />
+              <stop offset="100%" stop-color="#6366f1" />
+            </linearGradient>
+          </defs>
+          <path d="M 12,22 C 46,14 60,32 60,62" fill="none" stroke="url(#tbGrad)" stroke-width="10" stroke-linecap="round" />
+          <path d="M 45,50 L 60,66 L 75,50" fill="none" stroke="url(#tbGrad)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M 30,76 L 30,88 L 90,88 L 90,76" fill="none" stroke="url(#tbGrad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span data-tauri-drag-region>Instalação do Swoop</span>
+      </div>
+      <div class="window-controls">
+        <button id="btn-minimize" class="window-btn" title="Minimizar" aria-label="Minimizar">
+          <svg width="12" height="12" viewBox="0 0 12 12"><rect width="10" height="1" x="1" y="6" fill="currentColor" /></svg>
+        </button>
+        <button id="btn-close" class="window-btn close" title="Fechar" aria-label="Fechar">
+          <svg width="12" height="12" viewBox="0 0 12 12"><path d="M1,1 L11,11 M11,1 L1,11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none" /></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="glow glow-1"></div>
+      <div class="glow glow-2"></div>
+
+      <!-- 1. Boas-vindas -->
+      <section id="step-welcome" class="step active">
+        <svg class="logo" width="96" height="96" viewBox="0 0 100 100" aria-hidden="true">
+          <defs>
+            <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#38bdf8" />
+              <stop offset="100%" stop-color="#6366f1" />
+            </linearGradient>
+          </defs>
+          <rect x="2" y="2" width="96" height="96" rx="22" fill="#0b1120" stroke="url(#logoGrad)" stroke-width="2" />
+          <path d="M 18,27 C 46,21 57,35 57,60" fill="none" stroke="url(#logoGrad)" stroke-width="7.5" stroke-linecap="round" />
+          <path class="logo-arrow" d="M 46,51 L 57,62.5 L 68,51" fill="none" stroke="url(#logoGrad)" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M 36,69 L 36,78 L 78,78 L 78,69" fill="none" stroke="url(#logoGrad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <h1 class="app-name">Swoop</h1>
+        <p id="app-version" class="app-version">&nbsp;</p>
+        <p class="tagline">Seus downloads, num mergulho.</p>
+
+        <button id="btn-install" class="btn-primary">Instalar</button>
+        <button id="btn-toggle-dir" class="link-btn">Escolher pasta</button>
+        <div id="dir-row" class="dir-row hidden">
+          <span class="dir-label">Instalar em</span>
+          <span id="dir-path" class="dir-path"></span>
+          <button id="btn-browse" class="btn-secondary">Procurar…</button>
+        </div>
+      </section>
+
+      <!-- 2. Instalando -->
+      <section id="step-installing" class="step">
+        <svg class="installing-icon" width="72" height="72" viewBox="0 0 100 100" aria-hidden="true">
+          <path d="M 18,27 C 46,21 57,35 57,60" fill="none" stroke="url(#logoGrad)" stroke-width="7.5" stroke-linecap="round" />
+          <path class="logo-arrow" d="M 46,51 L 57,62.5 L 68,51" fill="none" stroke="url(#logoGrad)" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M 36,69 L 36,78 L 78,78 L 78,69" fill="none" stroke="url(#logoGrad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <h2 class="step-title">Instalando o Swoop</h2>
+        <p id="install-status" class="install-status">Preparando a instalação…</p>
+        <div class="progress-track"><div class="progress-shimmer"></div></div>
+        <p class="hint">Isso leva alguns instantes. Não feche esta janela.</p>
+      </section>
+
+      <!-- 3. Concluído -->
+      <section id="step-done" class="step">
+        <svg width="84" height="84" viewBox="0 0 84 84" aria-hidden="true">
+          <circle cx="42" cy="42" r="39" fill="none" stroke="url(#logoGrad)" stroke-width="3" />
+          <path class="check-path" d="M 26,43 L 38,55 L 60,31" fill="none" stroke="url(#logoGrad)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <h2 class="step-title">Instalação concluída!</h2>
+        <p class="subtitle">O Swoop foi instalado. Ele se atualiza sozinho quando sair versão nova.</p>
+        <label class="launch-row">
+          <input type="checkbox" id="chk-launch" checked />
+          <span class="checkmark"></span>
+          Abrir o Swoop agora
+        </label>
+        <button id="btn-finish" class="btn-primary">Concluir</button>
+      </section>
+
+      <!-- Erro -->
+      <section id="step-error" class="step">
+        <svg width="84" height="84" viewBox="0 0 84 84" aria-hidden="true">
+          <circle cx="42" cy="42" r="39" fill="none" stroke="#f87171" stroke-width="3" />
+          <path d="M 30,30 L 54,54 M 54,30 L 30,54" fill="none" stroke="#f87171" stroke-width="6" stroke-linecap="round" />
+        </svg>
+        <h2 class="step-title">Algo deu errado</h2>
+        <p id="error-detail" class="subtitle">A instalação não foi concluída.</p>
+        <button id="btn-retry" class="btn-primary">Tentar novamente</button>
+        <button id="btn-error-close" class="link-btn">Fechar</button>
+      </section>
+
+      <footer class="branding">© Rakjsu — Swoop</footer>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

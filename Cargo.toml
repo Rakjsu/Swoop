@@ -9,8 +9,10 @@ members = [
     "crates/hosts",
     "crates/service",
     "crates/testsrv",
+    "crates/update",
     "apps/swoop-cli",
     "apps/swoop",
+    "apps/swoop-installer",
 ]
 # O app desktop exige `ui/dist` já construído (generate_context!); fora do padrão
 # para `cargo build/test` funcionar sem Node. Use `-p swoop` quando precisar dele.
@@ -23,6 +25,7 @@ default-members = [
     "crates/hosts",
     "crates/service",
     "crates/testsrv",
+    "crates/update",
     "apps/swoop-cli",
 ]
 
@@ -43,11 +46,13 @@ swoop-engine = { path = "crates/engine" }
 swoop-hosts = { path = "crates/hosts" }
 swoop-service = { path = "crates/service" }
 swoop-testsrv = { path = "crates/testsrv" }
+swoop-update = { path = "crates/update" }
 
 # desktop
 tauri = { version = "2.11", features = [] }
 tauri-build = { version = "2.6", features = [] }
 tauri-plugin-single-instance = "2.4"
+tauri-plugin-dialog = "2.7"
 
 # rede (rustls com ring: sem aws-lc/NASM no Windows)
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "stream", "system-proxy"] }
@@ -67,7 +72,7 @@ sha2 = "0.11"
 md-5 = "0.11"
 hex = "0.4"
 dirs = "7"
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_IO", "Win32_System_Ioctl", "Win32_Storage_FileSystem"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_IO", "Win32_System_Ioctl", "Win32_Storage_FileSystem", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 # runtime / util
 tokio = { version = "1", features = ["full"] }
