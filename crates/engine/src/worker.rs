@@ -161,7 +161,7 @@ async fn fetch(ctx: &WorkerCtx, claim: Claim) -> Result<Outcome, TransferError> 
         }
         let adv = {
             let mut t = ctx.table.lock().expect("tabela envenenada");
-            let adv = t.advance(claim.idx, chunk.len());
+            let adv = t.advance(claim.idx, chunk.len(), Instant::now());
             ctx.progress.received.store(t.received(), Ordering::Relaxed);
             adv
         };
