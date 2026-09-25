@@ -3,6 +3,12 @@ resolver = "3"
 members = [
     "crates/core",
     "crates/api",
+    "crates/net",
+    "crates/store",
+    "crates/engine",
+    "crates/hosts",
+    "crates/service",
+    "crates/testsrv",
     "apps/swoop-cli",
     "apps/swoop",
 ]
@@ -11,6 +17,12 @@ members = [
 default-members = [
     "crates/core",
     "crates/api",
+    "crates/net",
+    "crates/store",
+    "crates/engine",
+    "crates/hosts",
+    "crates/service",
+    "crates/testsrv",
     "apps/swoop-cli",
 ]
 
@@ -25,13 +37,44 @@ repository = "https://github.com/rakjsu/swoop"
 # internos
 swoop-core = { path = "crates/core" }
 swoop-api = { path = "crates/api" }
+swoop-net = { path = "crates/net" }
+swoop-store = { path = "crates/store" }
+swoop-engine = { path = "crates/engine" }
+swoop-hosts = { path = "crates/hosts" }
+swoop-service = { path = "crates/service" }
+swoop-testsrv = { path = "crates/testsrv" }
 
 # desktop
 tauri = { version = "2.11", features = [] }
 tauri-build = { version = "2.6", features = [] }
 tauri-plugin-single-instance = "2.4"
 
+# rede (rustls com ring: sem aws-lc/NASM no Windows)
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "stream", "system-proxy"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+url = { version = "2", features = ["serde"] }
+http = "1"
+httpdate = "1"
+percent-encoding = "2"
+bytes = "1"
+
+# banco
+rusqlite = { version = "0.40", features = ["bundled"] }
+
+# disco / hash
+fs4 = "1"
+sha2 = "0.11"
+md-5 = "0.11"
+hex = "0.4"
+dirs = "7"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_IO", "Win32_System_Ioctl", "Win32_Storage_FileSystem"] }
+
 # runtime / util
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+futures-util = "0.3"
+async-trait = "0.1"
+async-speed-limit = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
@@ -39,6 +82,11 @@ eyre = "0.6"
 clap = { version = "4", features = ["derive"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# testes
+axum = "0.8"
+proptest = "1"
+tempfile = "3"
 
 [profile.release]
 lto = "fat"

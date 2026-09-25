@@ -294,7 +294,7 @@ Cada fase sai numa branch própria com um PR para `main` no `rakjsu/swoop`, e o 
   - (b) 0.1.0 atualiza para 0.1.1 e uma assinatura adulterada é recusada;
   - (c) agendador testado com relógio falso, incluindo a virada da meia-noite;
   - (d) VirusTotal registrado no release.
-- **Decisão pendente:** o updater e as regras remotas precisam de URLs públicas. Antes desta fase, ou o `swoop` vira público ou os releases e as regras vão para um repo público separado.
+- **Decidido (25/09):** o repositório `Rakjsu/Swoop` é público (MIT). O updater e as regras remotas usam GitHub Releases e o raw do próprio repo.
 
 ## Testes e ambientes
 - **Testes só onde é crítico:** motor, store, máquina de estados, parsers e cripto dos plugins (fixtures), extração, segurança da API e matar/retomar (`CARGO_BIN_EXE_swoop-cli`).
@@ -341,3 +341,22 @@ Cada fase sai numa branch própria com um PR para `main` no `rakjsu/swoop`, e o 
   5. Um RAR multiparte com senha da lista é extraído sozinho.
   6. No celular, o QR abre o painel e dá para pausar e adicionar um link.
   7. Uma extensão no Chrome envia um link.
+
+## Registro de decisões e medições
+
+- **25/09, fase 0:** CI verde (desktop, rust ubuntu, rust windows); `aws-lc-sys` ausente; `git status` limpo depois do build.
+- **25/09, fase 1:**
+  - `rusqlite_migration` trocado por migração própria via `PRAGMA user_version`, porque ele exige rustc 1.95.
+  - Checkpoint da escritora a cada 500 ms ou 8 MiB. Com 1 s ou 16 MiB, sessões curtas perdiam quase tudo: 178 MiB enviados para 128 MiB, contra 144 MiB depois da mudança.
+  - Portões medidos no Linux da nuvem:
+
+| Portão | Medida |
+|---|---|
+| (a) 128 MiB, 8 conexões, 5 mortes | sha256 ok; progresso 12,6 → 75,8 MiB |
+| (a) 1 GiB, release, 5 mortes | sha256 ok; 1043,5 MiB enviados (1,9% repetidos) |
+| (b) limite | 2 MiB/s medido 2,03–2,06 em 10 s; trocado para 5 MiB/s, medido 5,02 |
+| (c) sem Range | sonda + 1 requisição; sha256 ok |
+| (d) ETag trocado entre sessões | detectado; arquivo novo com sha256 da nova geração |
+| (e) 1 de 8 conexões a 64 KiB/s | 1,21–1,22× o tempo normal |
+| (f) 20 na fila, 3 simultâneos, 2 conexões | picos: 3 downloads, 6 conexões; com 4 por servidor, pico de 4 |
+| (g) proptest | invariante da tabela de segmentos mantido |
