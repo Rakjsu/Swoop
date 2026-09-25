@@ -18,7 +18,8 @@ fases com portões está em `docs/specs/2026-09-25-swoop-design.md`: ler antes d
 - **Playwright (portão a da fase 2):** `cargo build -p swoop-cli -p swoop-testsrv && cd ui && npm run e2e`. Na nuvem, `PW_CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (não rodar `playwright install`); no CI, `npx playwright install --with-deps chromium`.
 - **Portão b da fase 2:** `cargo test -p swoop-remote --test http websocket -- --nocapture` (45–55 retratos em 10 s pelo WebSocket, nenhum outro aviso).
 - **Portões da fase 1:**
-  - motor, dentro do processo (b–f): `cargo test -p swoop-engine --test download -- --nocapture`
+  - motor, dentro do processo (b, c, d, f): `cargo test -p swoop-engine --test download -- --nocapture`
+  - conexão lenta (e), num binário só dele por medir tempo: `cargo test -p swoop-engine --test slow_connection -- --nocapture`
   - matar e retomar (a): `cargo test -p swoop-cli --test kill_resume -- --nocapture`
   - versão de 1 GiB: `cargo test --release -p swoop-cli --test kill_resume -- --ignored --nocapture`
 - **Servidores (fase 3):**
