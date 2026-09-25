@@ -26,7 +26,7 @@ pub async fn until_idle(service: Service) -> eyre::Result<i32> {
             }
             _ = tick.tick() => {}
         }
-        let rows = service.list().await?;
+        let rows = service.rows().await?;
         print_progress(&snapshots.borrow(), &rows);
         if service.pending().await? == 0 && service.engine().active_count() == 0 {
             let failed = summarize(&rows);
@@ -38,7 +38,7 @@ pub async fn until_idle(service: Service) -> eyre::Result<i32> {
 
 /// Uma linha por download ativo.
 fn print_progress(snap: &Snapshot, rows: &[DownloadRow]) {
-    let names: HashMap<_, _> = rows.iter().map(|r| (r.id, r)).collect();
+    let names: HashMap<_, _> = rows.iter().map(|r| (r.id.0, r)).collect();
     for live in &snap.active {
         let name = names
             .get(&live.id)
@@ -49,7 +49,7 @@ fn print_progress(snap: &Snapshot, rows: &[DownloadRow]) {
             .map(|t| format!("{:5.1}%", live.received as f64 * 100.0 / t.max(1) as f64))
             .unwrap_or_else(|| format_bytes(live.received));
         println!(
-            "{} {name}  {pct}  {}/s  {} conexões",
+            "#{} {name}  {pct}  {}/s  {} conexões",
             live.id,
             format_bytes(live.speed_bps),
             live.conns

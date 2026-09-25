@@ -1,14 +1,11 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import type { AppInfo } from './gen/AppInfo';
 
-/** Identidade do app, espelho de `swoop_api::AppInfo`. */
-export interface AppInfo {
-  name: string;
-  version: string;
-}
+export type { AppInfo };
 
 /**
  * Busca nome e versão no processo Rust. Fora do Tauri (navegador puro) devolve
- * `null`: o transporte HTTP do painel remoto só chega na fase 2.
+ * `null`: o painel no navegador chega na v0.3.0.
  */
 export async function loadAppInfo(): Promise<AppInfo | null> {
   if (!isTauri()) {

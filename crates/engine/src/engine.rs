@@ -2,13 +2,14 @@
 //! limite de velocidade) e publica progresso e eventos.
 
 use crate::job::EngineEvent;
-use crate::progress::{JobProgress, Snapshot, SpeedMeter};
+use crate::progress::{JobProgress, SpeedMeter};
 use crate::scheduler;
 use async_speed_limit::Limiter;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use swoop_core::{DownloadId, Event, Resolver, Settings};
+use swoop_api::Snapshot;
+use swoop_core::{DownloadId, DownloadState, Event, Resolver, Settings};
 use swoop_net::reqwest;
 use swoop_store::{Store, StoreError, downloads};
 use tokio::sync::{Notify, broadcast, watch};
@@ -42,6 +43,9 @@ pub(crate) struct Inner {
     pub settings: Mutex<Settings>,
     pub wake: Notify,
     pub active: Mutex<HashMap<DownloadId, Active>>,
+    /// Downloads no meio de uma remoção: o agendador não os inicia. Sempre
+    /// travar `active` antes deste (a ordem evita impasse).
+    pub removing: Mutex<HashSet<DownloadId>>,
     pub snapshot_tx: watch::Sender<Snapshot>,
     pub events_tx: broadcast::Sender<EngineEvent>,
     pub shutdown: CancellationToken,
@@ -50,7 +54,7 @@ pub(crate) struct Inner {
 /// Handle clonável do motor.
 #[derive(Clone)]
 pub struct Engine {
-    inner: Arc<Inner>,
+    pub(crate) inner: Arc<Inner>,
 }
 
 /// Converte o limite em bytes/s para o limitador (sem limite = infinito).
@@ -78,6 +82,7 @@ impl Engine {
                 settings: Mutex::new(cfg.settings),
                 wake: Notify::new(),
                 active: Mutex::new(HashMap::new()),
+                removing: Mutex::new(HashSet::new()),
                 snapshot_tx,
                 events_tx,
                 shutdown: CancellationToken::new(),
@@ -105,7 +110,7 @@ impl Engine {
         if let Some(a) = self.inner.active.lock().expect("mutex").get(&id) {
             a.cancel.cancel();
         }
-        self.wake();
+        self.changed();
         Ok(())
     }
 
@@ -115,7 +120,7 @@ impl Engine {
             .store
             .call(move |c| downloads::transition(c, id, Event::Resume))
             .await?;
-        self.wake();
+        self.changed();
         Ok(())
     }
 
@@ -128,8 +133,40 @@ impl Engine {
                 downloads::transition(c, id, Event::Retry)
             })
             .await?;
-        self.wake();
+        self.changed();
         Ok(())
+    }
+
+    /// Pausa tudo o que ainda anda (fila, ativos, esperas).
+    pub async fn pause_all(&self) -> Result<(), StoreError> {
+        for id in self.ids_accepting(Event::Pause).await? {
+            ignore_race(self.pause(id).await)?;
+        }
+        Ok(())
+    }
+
+    /// Retoma todos os pausados.
+    pub async fn resume_all(&self) -> Result<(), StoreError> {
+        for id in self.ids_accepting(Event::Resume).await? {
+            ignore_race(self.resume(id).await)?;
+        }
+        Ok(())
+    }
+
+    /// Downloads cujo estado atual aceita o evento.
+    async fn ids_accepting(&self, event: Event) -> Result<Vec<DownloadId>, StoreError> {
+        let rows = self.inner.store.call(|c| downloads::list(c)).await?;
+        Ok(rows
+            .into_iter()
+            .filter(|r| DownloadState::next(r.state, event).is_ok())
+            .map(|r| r.id)
+            .collect())
+    }
+
+    /// Avisa as interfaces e o agendador de que a fila mudou.
+    pub(crate) fn changed(&self) {
+        let _ = self.inner.events_tx.send(EngineEvent::Changed);
+        self.wake();
     }
 
     /// Muda o limite global de velocidade na hora (`None` = sem limite).
@@ -180,6 +217,15 @@ impl Engine {
         for h in handles {
             let _ = h.await;
         }
+    }
+}
+
+/// Ações em lote: um item que mudou de estado no meio (terminou, foi
+/// removido) é pulado em vez de interromper o resto.
+fn ignore_race(r: Result<(), StoreError>) -> Result<(), StoreError> {
+    match r {
+        Err(StoreError::Transition(_) | StoreError::NotFound(_)) => Ok(()),
+        other => other,
     }
 }
 

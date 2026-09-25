@@ -7,8 +7,13 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-swoop-core.workspace = true
+swoop-core = { workspace = true, features = ["ts"] }
+async-trait.workspace = true
 serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+# Os tipos TypeScript saem dos testes (`cargo test -p swoop-api`) para `ui/src/gen`.
+ts-rs.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

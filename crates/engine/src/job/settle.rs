@@ -19,6 +19,9 @@ pub enum EngineEvent {
     Failed(DownloadId, String),
     /// Saiu sem mudar o estado (pausa ou encerramento).
     Stopped(DownloadId),
+    /// A fila mudou (transição de estado, item removido, esperas vencidas):
+    /// as interfaces recarregam a lista.
+    Changed,
 }
 
 /// Espera base entre tentativas do download inteiro (cresce por tentativa).

@@ -163,5 +163,6 @@ async fn transition(ctx: &JobCtx, id: DownloadId, event: Event) -> Result<(), Tr
     ctx.store
         .call(move |c| downloads::transition(c, id, event))
         .await?;
+    let _ = ctx.events.send(EngineEvent::Changed);
     Ok(())
 }

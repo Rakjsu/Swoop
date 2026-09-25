@@ -365,3 +365,8 @@ Cada fase sai numa branch própria com um PR para `main` no `rakjsu/swoop`, e o 
   - Decisão do dono: a atualização vem das Releases do GitHub, sem chave própria de assinatura (como o NeoStream). Garantias: HTTPS com certificado verificado, URL restrita a `github.com/Rakjsu/Swoop/releases/download/`, sha256 do `SHA256SUMS.txt` e nada de voltar para versão anterior.
   - Risco aceito: se a conta do GitHub for comprometida, uma release falsa seria instalada.
   - Caminho para fechar esse risco: trocar pelo `tauri-plugin-updater` com a chave privada nos Secrets. O plugin já foi conferido: usa rustls com ring, sem aws-lc.
+- **25/09, fase 2a (v0.2.0), pedido do dono:** fase 2 em duas atualizações. X da janela → bandeja; notificações só de "fila terminou" e falha (v0.3.0); lista simples (pacotes na fase 3).
+  - Contrato em `crates/api` com ts-rs 12 (`TS_RS_LARGE_INT = "number"`): a UI importa de `ui/src/gen`, nunca redeclara. `DownloadState` ganha TS pela feature `ts` do core.
+  - O motor publica o `Snapshot` do contrato direto (sem cópia no engine) e emite `EngineEvent::Changed` a cada transição; o serviço junta rajadas num `Push::Changed`.
+  - Revisão técnica conferida no código do Tauri 2.11.6: `RunEvent::Exit` é o ponto do shutdown (o `app.exit` do updater passa por ele); `Channel::send` não falha quando a página recarrega, por isso uma assinatura por vez; o opener entra só como função Rust (sem `opener:default`, que deixaria o JS abrir URLs).
+  - Validado no app real (Xvfb + testsrv): adicionar, pausar, retomar, remover no meio (o `.part` some), remover concluído com e sem apagar o arquivo, limite de 2 MB/s respeitado, espera com contagem e retomada automática ao reabrir depois de matar o processo.

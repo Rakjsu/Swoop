@@ -2,6 +2,7 @@
 //! estado atual e aplica `DownloadState::next` na mesma chamada do ator: não
 //! há como gravar uma transição inválida.
 
+use crate::history::{self, Outcome};
 use crate::{StoreError, now_ms};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use std::path::{Path, PathBuf};
@@ -261,6 +262,28 @@ pub fn set_attempts(c: &Connection, id: DownloadId, attempts: u32) -> Result<(),
         params![id.0, attempts],
     )?;
     Ok(())
+}
+
+/// Tira o download da fila (os segmentos saem em cascata) e apaga o pacote
+/// que ficar vazio, numa transação. Registra `removed` no histórico, a menos
+/// que já esteja lá como concluído ou falho. Devolve a linha como estava
+/// (`None` se já não existia), para quem chamou apagar os arquivos.
+pub fn remove(c: &mut Connection, id: DownloadId) -> Result<Option<DownloadRow>, StoreError> {
+    let tx = c.transaction()?;
+    let Some(row) = get(&tx, id)? else {
+        return Ok(None);
+    };
+    if !row.state.is_final() {
+        history::record(&tx, id, Outcome::Removed)?;
+    }
+    tx.execute("DELETE FROM downloads WHERE id = ?1", [id.0])?;
+    tx.execute(
+        "DELETE FROM packages WHERE id = ?1
+         AND NOT EXISTS (SELECT 1 FROM downloads WHERE package_id = ?1)",
+        [row.package_id.0],
+    )?;
+    tx.commit()?;
+    Ok(Some(row))
 }
 
 #[cfg(test)]

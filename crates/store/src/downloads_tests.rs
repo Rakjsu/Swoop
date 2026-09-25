@@ -105,3 +105,51 @@ fn sonda_e_caminho_final() {
     assert_eq!(row.final_path, Some(PathBuf::from("/tmp/a.bin")));
     assert_eq!(row.part_path, None);
 }
+
+#[test]
+fn remover_registra_historico_e_apaga_pacote_vazio() {
+    let (mut c, pkg) = setup();
+    let a = insert(&c, pkg, "http://x/a").unwrap();
+    let b = insert(&c, pkg, "http://x/b").unwrap();
+    let seg = crate::SegmentRow {
+        idx: 0,
+        start: 0,
+        end: 10,
+        pos: 0,
+    };
+    crate::segments::replace(&mut c, a, &[seg]).unwrap();
+
+    let row = remove(&mut c, a).unwrap().unwrap();
+    assert_eq!(row.id, a);
+    assert!(get(&c, a).unwrap().is_none());
+    assert!(crate::segments::load(&c, a).unwrap().is_empty());
+    assert_eq!(crate::history::count(&c).unwrap(), 1);
+
+    // o pacote continua enquanto tiver downloads
+    let pkgs = |c: &Connection| -> i64 {
+        c.query_row("SELECT COUNT(*) FROM packages", [], |r| r.get(0))
+            .unwrap()
+    };
+    assert_eq!(pkgs(&c), 1);
+    remove(&mut c, b).unwrap();
+    assert_eq!(pkgs(&c), 0);
+    assert!(remove(&mut c, b).unwrap().is_none());
+}
+
+#[test]
+fn remover_concluido_nao_duplica_historico() {
+    let (mut c, pkg) = setup();
+    let id = insert(&c, pkg, "http://x/a").unwrap();
+    for ev in [
+        Event::Start,
+        Event::Resolved,
+        Event::Transferred,
+        Event::Verified,
+        Event::Finalized,
+    ] {
+        transition(&c, id, ev).unwrap();
+    }
+    crate::history::record(&c, id, crate::history::Outcome::Completed).unwrap();
+    remove(&mut c, id).unwrap();
+    assert_eq!(crate::history::count(&c).unwrap(), 1);
+}

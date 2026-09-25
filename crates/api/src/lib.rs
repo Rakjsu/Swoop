@@ -1,13 +1,27 @@
-//! Contrato compartilhado entre o motor e quem o controla: a janela Tauri, o
-//! painel web do celular e a extensão de navegador.
+//! Contrato compartilhado entre o motor e quem o controla: a janela Tauri e,
+//! a partir da v0.3.0, o painel web (e depois a extensão de navegador).
 //!
-//! Na fase 0 só existe `AppInfo`; `Command`, `Snapshot`, `Event` e a trait
-//! `Backend` entram na fase 2, com os tipos TypeScript gerados por `ts-rs`.
+//! - `command`: pedidos da interface (`Command`) e respostas (`Reply`);
+//! - `view`: o que a interface mostra (linhas da fila, retrato ao vivo, avisos);
+//! - `backend`: a trait `Backend`, única porta de entrada das interfaces.
+//!
+//! Os tipos TypeScript saem daqui pelo `ts-rs` (`cargo test -p swoop-api`)
+//! para `ui/src/gen`; a UI nunca redeclara esses tipos à mão.
+
+mod backend;
+mod command;
+mod view;
+
+pub use backend::{ApiError, Backend, Subscription};
+pub use command::{Command, Reply};
+pub use view::{DownloadView, LiveRow, Push, Snapshot};
 
 use serde::Serialize;
+use ts_rs::TS;
 
 /// Identidade do app devolvida para a interface (tela "Sobre", título).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
 pub struct AppInfo {
     pub name: String,
     pub version: String,

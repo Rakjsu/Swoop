@@ -2064,6 +2064,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "791930b43c0d5973160d90a8f3894509f2b273430f5c5c73b668636d0287c5c0"
 
 [[package]]
+name = "is-docker"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "928bae27f42bc99b60d9ac7334e3a21d10ad8f1835a4e12ec3ec0464765ed1b3"
+dependencies = [
+ "once_cell",
+]
+
+[[package]]
+name = "is-wsl"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "173609498df190136aa7dea1a91db051746d339e18476eed5ca40521f02d7aa5"
+dependencies = [
+ "is-docker",
+ "once_cell",
+]
+
+[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2764,6 +2783,17 @@ name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
+
+[[package]]
+name = "open"
+version = "5.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa576c76302b7b808eecc68061e67336c47833ef9d22caa74dda10fa9675eebc"
+dependencies = [
+ "dunce",
+ "is-wsl",
+ "libc",
+]
 
 [[package]]
 name = "openssl-probe"
@@ -3999,16 +4029,19 @@ dependencies = [
 
 [[package]]
 name = "swoop"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
  "swoop-api",
  "swoop-core",
  "swoop-net",
+ "swoop-service",
  "swoop-update",
  "tauri",
  "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-opener",
  "tauri-plugin-single-instance",
  "tokio",
  "tracing",
@@ -4018,16 +4051,20 @@ dependencies = [
 
 [[package]]
 name = "swoop-api"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
+ "async-trait",
  "serde",
  "serde_json",
  "swoop-core",
+ "thiserror 2.0.21",
+ "tokio",
+ "ts-rs",
 ]
 
 [[package]]
 name = "swoop-cli"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "clap",
  "eyre",
@@ -4046,18 +4083,19 @@ dependencies = [
 
 [[package]]
 name = "swoop-core"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "percent-encoding",
  "serde",
  "thiserror 2.0.21",
+ "ts-rs",
  "url",
 ]
 
 [[package]]
 name = "swoop-engine"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "async-speed-limit",
  "bytes",
@@ -4068,6 +4106,7 @@ dependencies = [
  "proptest",
  "serde",
  "sha2 0.11.0",
+ "swoop-api",
  "swoop-core",
  "swoop-hosts",
  "swoop-net",
@@ -4084,7 +4123,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-hosts"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "swoop-core",
@@ -4094,7 +4133,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-installer"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "serde",
  "tauri",
@@ -4105,7 +4144,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-net"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "httpdate",
  "percent-encoding",
@@ -4116,9 +4155,11 @@ dependencies = [
 
 [[package]]
 name = "swoop-service"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
+ "async-trait",
  "dirs 7.0.0",
+ "swoop-api",
  "swoop-core",
  "swoop-engine",
  "swoop-hosts",
@@ -4133,7 +4174,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-store"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "rusqlite",
  "swoop-core",
@@ -4144,7 +4185,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-testsrv"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "axum",
  "bytes",
@@ -4160,7 +4201,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-update"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "futures-util",
  "hex",
@@ -4489,6 +4530,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-opener"
+version = "2.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60d60366174b745b4ef5824b8bbc1c457fd08f0ce101ff643c0a49181a9f4e91"
+dependencies = [
+ "dunce",
+ "glob",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "open",
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.21",
+ "url",
+ "windows",
+ "zbus",
+]
+
+[[package]]
 name = "tauri-plugin-single-instance"
 version = "2.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4624,6 +4687,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5fed54709c5b3a53d09bb1c113ea4f5ceafd1e772ddcb0030a82e1d56c087b08"
 dependencies = [
  "new_debug_unreachable",
+]
+
+[[package]]
+name = "termcolor"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
+dependencies = [
+ "winapi-util",
 ]
 
 [[package]]
@@ -5027,6 +5099,28 @@ name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
+
+[[package]]
+name = "ts-rs"
+version = "12.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "756050066659291d47a554a9f558125db17428b073c5ffce1daf5dcb0f7231d8"
+dependencies = [
+ "thiserror 2.0.21",
+ "ts-rs-macros",
+]
+
+[[package]]
+name = "ts-rs-macros"
+version = "12.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38d90eea51bc7988ef9e674bf80a85ba6804739e535e9cab48e4bb34a8b652aa"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+ "termcolor",
+]
 
 [[package]]
 name = "typeid"

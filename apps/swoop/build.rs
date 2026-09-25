@@ -5,8 +5,15 @@
 //! (capabilities/main.json). Comando novo precisa entrar nas duas listas.
 
 fn main() {
-    let manifest =
-        tauri_build::AppManifest::new().commands(&["app_info", "update_status", "install_update"]);
+    let manifest = tauri_build::AppManifest::new().commands(&[
+        "app_info",
+        "exec",
+        "list",
+        "subscribe",
+        "reveal_download",
+        "update_status",
+        "install_update",
+    ]);
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(manifest))
         .expect("falha ao gerar o contexto do Tauri");
 }

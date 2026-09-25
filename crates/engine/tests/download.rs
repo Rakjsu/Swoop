@@ -111,7 +111,7 @@ async fn limite_de_velocidade_global() {
             .borrow()
             .active
             .iter()
-            .find(|r| r.id == id)
+            .find(|r| r.id == id.0)
             .map_or(0, |r| r.received)
     };
 
