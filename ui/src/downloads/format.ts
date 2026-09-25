@@ -47,7 +47,7 @@ export function stateLabel(state: DownloadState): string {
 }
 
 /** Nome exibido: o do arquivo, ou o fim do link enquanto não se sabe. */
-export function displayName(row: DownloadView): string {
+export function displayName(row: Pick<DownloadView, 'file_name' | 'url'>): string {
   if (row.file_name) return row.file_name;
   try {
     const path = new URL(row.url).pathname.split('/').filter(Boolean);

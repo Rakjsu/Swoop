@@ -10,6 +10,7 @@ members = [
     "crates/service",
     "crates/testsrv",
     "crates/update",
+    "crates/remote",
     "apps/swoop-cli",
     "apps/swoop",
     "apps/swoop-installer",
@@ -26,11 +27,12 @@ default-members = [
     "crates/service",
     "crates/testsrv",
     "crates/update",
+    "crates/remote",
     "apps/swoop-cli",
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "MIT"
 rust-version = "1.93"
@@ -47,6 +49,7 @@ swoop-hosts = { path = "crates/hosts" }
 swoop-service = { path = "crates/service" }
 swoop-testsrv = { path = "crates/testsrv" }
 swoop-update = { path = "crates/update" }
+swoop-remote = { path = "crates/remote" }
 
 # desktop
 tauri = { version = "2.11", features = [] }
@@ -54,6 +57,7 @@ tauri-build = { version = "2.6", features = [] }
 tauri-plugin-single-instance = "2.4"
 tauri-plugin-dialog = "2.7"
 tauri-plugin-opener = "2"
+tauri-plugin-notification = "2"
 
 # rede (rustls com ring: sem aws-lc/NASM no Windows)
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "stream", "system-proxy"] }
@@ -90,8 +94,13 @@ clap = { version = "4", features = ["derive"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# painel em loopback (e testes)
+axum = { version = "0.8", features = ["ws"] }
+tower-http = { version = "0.6", features = ["fs"] }
+getrandom = "0.3"
+tokio-tungstenite = "0.29"
+
 # testes
-axum = "0.8"
 proptest = "1"
 tempfile = "3"
 

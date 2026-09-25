@@ -33,7 +33,7 @@ O Swoop respeita as regras dos servidores:
 | 0 ✅ | Esqueleto: workspace, CLI, app Tauri mínimo, UI, CI | CI verde (ubuntu + windows); janela abre no Windows ⏳ |
 | 1 ✅ | Motor de download com links diretos + CLI | 5 mortes + retomada, sha256 ok (128 MiB e 1 GiB); limite 2,03/5,02 MiB/s; conexão lenta 1,22× |
 | 2a ✅ | Tela de downloads: adicionar links, pausar/retomar/remover, limite, bandeja (v0.2.0) | testado no app real com o servidor de teste; retoma após reabrir |
-| 2b | Histórico, opções, notificações, painel no navegador (`serve`), Playwright (v0.3.0) | Playwright verde; 45–55 retratos em 10 s |
+| 2b ✅ | Histórico, opções salvas, pasta automática por tipo, notificações, painel no navegador (`serve`) (v0.3.0) | Playwright: pausar tudo zera em ≤ 1 s e 3 × 24 MB certos; 50 retratos em 10 s |
 | 3 | Pixeldrain, Mediafire, Google Drive + coletor de links | fixtures + downloads reais com hash |
 | 4 | Janela de captcha, fastfile.cc (XFS), contas premium | 3 downloads grátis seguidos; segredo fora do disco |
 | 5 | Extração com 7-Zip | RAR5 multiparte com senha; zip-slip bloqueado |
@@ -64,7 +64,12 @@ cd apps/swoop && ../../ui/node_modules/.bin/tauri dev --config tauri.dev.conf.js
 cargo run --release -p swoop-cli -- get "https://exemplo.com/arquivo.zip" --connections 8 --limit 2M
 cargo run --release -p swoop-cli -- resume      # continua o que ficou pela metade
 cargo run --release -p swoop-cli -- list        # mostra a fila
+
+# painel no navegador (127.0.0.1): imprime o endereço com o token
+cargo run --release -p swoop-cli -- serve --ui ui/dist
 ```
+
+**Pastas automáticas:** sem pasta escolhida ao adicionar, vídeos vão para `Vídeos\Swoop`, áudio para `Músicas\Swoop` e o resto para `Downloads\Swoop` (trocáveis em Opções).
 
 Ctrl+C grava o progresso antes de sair; matar o processo perde no máximo o último meio segundo.
 Pasta de dados: `SWOOP_DATA_DIR` ou `%LOCALAPPDATA%\io.github.rakjsu.swoop` (Windows).
@@ -94,6 +99,7 @@ No app, o X da janela só esconde: os downloads continuam e o ícone da bandeja 
 | `crates/engine` | motor: agendador, segmentos com divisão dinâmica, escritora, limite de velocidade |
 | `crates/hosts` | plugins de servidores (fase 1: link direto) |
 | `crates/service` | liga banco + motor + plugins; trava de instância única; implementa `Backend` |
+| `crates/remote` | painel no navegador: arquivos da UI + API HTTP/WebSocket em 127.0.0.1, com token |
 | `crates/testsrv` | servidor HTTP de teste com Range e falhas simuladas (só testes) |
 | `crates/update` | atualização pelas Releases do GitHub (consulta, download, sha256) |
 | `apps/swoop-installer` | instalador personalizado: janela própria que roda o setup NSIS em silêncio |
@@ -103,7 +109,7 @@ No app, o X da janela só esconde: os downloads continuam e o ícone da bandeja 
 | `ui/` | interface React + TypeScript: `transport/` (IPC do Tauri; HTTP na v0.3.0), `downloads/` (tela), `gen/` (tipos gerados, não editar) |
 | `docs/` | desenho e decisões |
 
-Os crates `extract` e `remote` chegam na fase 5 e na v0.3.0.
+O crate `extract` chega na fase 5.
 
 ## Desenvolvimento
 
@@ -111,6 +117,7 @@ Os crates `extract` e `remote` chegam na fase 5 e na v0.3.0.
 cargo fmt --all && cargo clippy --all-targets -- -D warnings && cargo test
 cd ui && npm run lint && npm run build
 cargo clippy -p swoop --all-targets -- -D warnings   # app desktop (precisa de ui/dist)
+cargo build -p swoop-cli -p swoop-testsrv && cd ui && npm run e2e   # Playwright (painel real)
 ```
 
 - Código e comentários em português; identificadores em inglês.

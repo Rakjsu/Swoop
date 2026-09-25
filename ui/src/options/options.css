@@ -1,0 +1,93 @@
+/* Tela de opções. */
+
+.options {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 24px 24px;
+  max-width: 760px;
+}
+
+.options h2 {
+  margin-top: 12px;
+  font-size: 15px;
+}
+
+.opt-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.opt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.opt-field > span {
+  color: var(--text-dim);
+}
+
+.opt-number {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.opt-folder {
+  display: flex;
+  gap: 8px;
+}
+
+.options input[type='text'],
+.options input[type='number'] {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.options input[type='text'] {
+  flex: 1;
+}
+
+.options input[type='number'] {
+  width: 110px;
+}
+
+.opt-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.opt-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.opt-status {
+  font-size: 13px;
+}
+
+.opt-ok {
+  color: var(--ok);
+}
+
+.opt-error {
+  color: var(--danger);
+}
+
+.opt-loading {
+  padding: 32px;
+  color: var(--text-dim);
+}

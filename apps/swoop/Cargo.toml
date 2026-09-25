@@ -21,6 +21,7 @@ swoop-service.workspace = true
 swoop-update.workspace = true
 tauri = { workspace = true, features = ["tray-icon"] }
 tauri-plugin-dialog.workspace = true
+tauri-plugin-notification.workspace = true
 tauri-plugin-opener.workspace = true
 tauri-plugin-single-instance.workspace = true
 serde.workspace = true

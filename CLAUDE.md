@@ -14,6 +14,9 @@ fases com portões está em `docs/specs/2026-09-25-swoop-design.md`: ler antes d
 - **App com downloads de verdade sem Windows:** `cargo build -p swoop --features tauri/custom-protocol` (embute `ui/dist`), `Xvfb :55 &`, `DISPLAY=:55 SWOOP_DATA_DIR=… SWOOP_NO_UPDATE=1 ./target/debug/swoop`, testsrv em outra porta; cliques com `xdotool`, print com `import -window root`.
 - **CLI:** `cargo run --release -p swoop-cli -- get <url> --connections 8 --limit 2M --data-dir data/dev --dest data/dl` · `resume` · `list`
 - **Servidor de teste:** `cargo run --release -p swoop-testsrv -- 8765` (imprime URL e sha256 esperado; botões em `crates/testsrv/src/knobs.rs`)
+- **Painel no navegador:** `cargo run -p swoop-cli -- serve --ui ui/dist` imprime `http://127.0.0.1:P/#t=<token>` (só loopback; token novo a cada execução).
+- **Playwright (portão a da fase 2):** `cargo build -p swoop-cli -p swoop-testsrv && cd ui && npm run e2e`. Na nuvem, `PW_CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (não rodar `playwright install`); no CI, `npx playwright install --with-deps chromium`.
+- **Portão b da fase 2:** `cargo test -p swoop-remote --test http websocket -- --nocapture` (45–55 retratos em 10 s pelo WebSocket, nenhum outro aviso).
 - **Portões da fase 1:**
   - motor, dentro do processo (b–f): `cargo test -p swoop-engine --test download -- --nocapture`
   - matar e retomar (a): `cargo test -p swoop-cli --test kill_resume -- --nocapture`
@@ -50,6 +53,9 @@ fases com portões está em `docs/specs/2026-09-25-swoop-design.md`: ler antes d
 - **Migrações do SQLite:** ficam em `crates/store/src/migrations/` e a versão vai em `PRAGMA user_version`. Migração nova é arquivo novo no fim da lista, nunca edição de uma já publicada. O `rusqlite_migration` foi descartado porque exige rustc 1.95.
 - **Comando Tauri:** argumentos chegam em camelCase do JS (`subscribe({ onPush })`). Comando async com `State` devolve `Result` (erro = `ApiError`, serializável).
 - **Assinatura da UI (`subscribe`):** o Rust guarda só uma (a nova derruba a anterior). A UI assina uma vez por carga, no módulo `ui/src/transport/tauri.ts`; componentes ouvem o emissor local. Assinar num `useEffect` quebraria no StrictMode.
+- **Pasta automática:** pacote com `auto_dest` escolhe a pasta pelo tipo (`core::file_kind`) no `prepare`, quando o nome real já é conhecido; retomada termina na pasta do `.part`. Pasta escolhida à mão vale para o pacote inteiro.
+- **Preferências:** `ServiceOptions.settings = None` usa as salvas (app, `serve`); `Some` (CLI) não grava. Pastas `None` são preenchidas com as do sistema + `Swoop` antes de chegar ao motor.
+- **Painel (`crates/remote`):** guarda de `Host`/`Origin` em tudo; API com `Bearer`; WebSocket autentica pela 1ª mensagem (navegador não manda cabeçalho). Token nunca vai para log (`Debug` do `Token` esconde).
 - **Remover download:** `Engine::remove` marca o id em `removing` (sob a trava do `active`, que o `spawn_job` confere) antes de parar o job; só depois grava histórico + DELETE e apaga o `.part`. O `exec` responde na hora e a remoção termina em segundo plano.
 - **Estado de download:** muda só via `downloads::transition` (valida com `DownloadState::next`). Transição recusada no job significa que o usuário pausou ou removeu, e o job sai quieto (`TransferError::Cancelled`).
 - **Checkpoint:** a cada 500 ms ou 8 MiB, sempre `sync_data` antes do SQLite. O banco nunca afirma bytes que não estão no disco.

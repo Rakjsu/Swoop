@@ -3,11 +3,13 @@
 //! - `get <links>…`: adiciona e baixa até terminar (retoma pendentes também);
 //! - `resume`: continua o que ficou pela metade;
 //! - `list`: mostra a fila;
+//! - `serve`: painel no navegador (127.0.0.1) sobre o motor real;
 //! - `info`: nome e versão.
 //!
-//! `check`, `resolve`, `serve` e `extract` chegam nas fases 2–5.
+//! `check`, `resolve` e `extract` chegam nas fases 3–5.
 
 mod run;
+mod serve;
 
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
@@ -51,6 +53,18 @@ enum Command {
     List {
         #[command(flatten)]
         common: Common,
+    },
+    /// Painel no navegador em 127.0.0.1 (imprime o endereço com o token)
+    Serve {
+        /// Pasta com o build da UI
+        #[arg(long, default_value = "ui/dist")]
+        ui: PathBuf,
+        /// Porta (0 = qualquer livre)
+        #[arg(long, default_value_t = 0)]
+        port: u16,
+        /// Pasta de dados (banco); padrão: SWOOP_DATA_DIR ou a pasta do SO
+        #[arg(long)]
+        data_dir: Option<PathBuf>,
     },
 }
 
@@ -119,6 +133,7 @@ async fn main() -> eyre::Result<()> {
             let service = Service::open(common.options()).await?;
             run::until_idle(service).await?
         }
+        Command::Serve { ui, port, data_dir } => serve::serve(data_dir, ui, port).await?,
         Command::List { common } => {
             let service = Service::open(common.options()).await?;
             run::print_list(&service.rows().await?);

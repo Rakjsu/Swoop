@@ -9,6 +9,8 @@
     "allow-app-info",
     "allow-exec",
     "allow-list",
+    "allow-history",
+    "allow-settings",
     "allow-subscribe",
     "allow-reveal-download",
     "allow-update-status",

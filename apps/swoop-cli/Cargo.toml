@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 swoop-core.workspace = true
 swoop-engine.workspace = true
+swoop-remote.workspace = true
 swoop-service.workspace = true
 swoop-store.workspace = true
 clap.workspace = true

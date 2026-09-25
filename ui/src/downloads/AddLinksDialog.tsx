@@ -60,7 +60,7 @@ export function AddLinksDialog({ transport, onClose }: Props) {
         />
         <div className="modal-dest">
           <span className="modal-dest-path" title={dest ?? undefined}>
-            {dest ?? 'Pasta padrão (Downloads\\Swoop)'}
+            {dest ?? 'Pasta automática: vídeos, músicas e outros, cada um na sua (ver Opções)'}
           </span>
           {transport.pickFolder && (
             <button type="button" className="btn" onClick={pick}>
