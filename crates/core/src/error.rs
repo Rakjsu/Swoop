@@ -1,5 +1,6 @@
 //! Erros de servidor e a regra padrão para decidir o que fazer com uma falha HTTP.
 
+use crate::captcha::CaptchaChallenge;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 
@@ -81,6 +82,9 @@ pub enum HostError {
     BrowserRequired(String),
     #[error("o arquivo é privado ou exige login")]
     AccessDenied,
+    /// O servidor pediu um captcha que o usuário resolve na janela do app.
+    #[error("o servidor pediu um captcha")]
+    Captcha(Box<CaptchaChallenge>),
 }
 
 /// Falha de uma requisição durante o download (dados mínimos para classificar).

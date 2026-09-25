@@ -60,10 +60,7 @@ mod tests {
     use super::*;
 
     fn req(s: &str) -> ResolveRequest {
-        ResolveRequest {
-            url: Url::parse(s).unwrap(),
-            attempt: 0,
-        }
+        ResolveRequest::new(Url::parse(s).unwrap())
     }
 
     #[tokio::test]

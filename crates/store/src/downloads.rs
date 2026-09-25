@@ -32,6 +32,8 @@ pub struct DownloadRow {
     pub position: i64,
     pub started_at: Option<i64>,
     pub finished_at: Option<i64>,
+    /// Desafio de captcha pendente (JSON), em `captcha_needed`.
+    pub captcha: Option<String>,
 }
 
 /// O que a sonda descobriu sobre o arquivo.
@@ -48,7 +50,7 @@ pub struct ProbeInfo {
 
 const COLUMNS: &str = "id, package_id, url, host_key, state, wait_until, wait_reason, error_kind,
     error_msg, attempts, file_name, size, done_bytes, resumable, etag, last_modified, part_path,
-    final_path, position, started_at, finished_at";
+    final_path, position, started_at, finished_at, captcha";
 
 /// Converte uma linha do SELECT padrão.
 fn from_row(r: &Row<'_>) -> rusqlite::Result<DownloadRow> {
@@ -76,6 +78,7 @@ fn from_row(r: &Row<'_>) -> rusqlite::Result<DownloadRow> {
         position: r.get(18)?,
         started_at: r.get(19)?,
         finished_at: r.get(20)?,
+        captcha: r.get(21)?,
     })
 }
 
@@ -147,6 +150,9 @@ pub fn transition(
             [id.0],
         )?;
     }
+    if matches!(event, Event::Pause | Event::Fail | Event::Retry) {
+        crate::captcha::clear(c, id)?;
+    }
     if matches!(event, Event::WaitElapsed | Event::Pause | Event::Retry) {
         c.execute(
             "UPDATE downloads SET wait_until = NULL, wait_reason = NULL WHERE id = ?1",
@@ -213,7 +219,7 @@ pub fn wake_due(c: &Connection, now: i64) -> Result<usize, StoreError> {
 pub fn recover_all(c: &Connection) -> Result<usize, StoreError> {
     Ok(c.execute(
         "UPDATE downloads SET state = 'queued'
-         WHERE state IN ('resolving', 'downloading', 'verifying')",
+         WHERE state IN ('resolving', 'downloading', 'verifying', 'captcha_needed')",
         [],
     )?)
 }

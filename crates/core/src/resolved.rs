@@ -1,5 +1,6 @@
 //! O que um plugin de servidor entrega ao motor: o link direto e como baixá-lo.
 
+use crate::captcha::CaptchaAnswer;
 use std::time::SystemTime;
 use url::Url;
 
@@ -9,6 +10,19 @@ pub struct ResolveRequest {
     pub url: Url,
     /// 0 na primeira vez; cresce a cada nova resolução do mesmo download.
     pub attempt: u32,
+    /// Captcha resolvido pelo usuário para o desafio que o plugin pediu.
+    pub captcha: Option<CaptchaAnswer>,
+}
+
+impl ResolveRequest {
+    /// Primeira resolução de um link, sem captcha.
+    pub fn new(url: Url) -> Self {
+        Self {
+            url,
+            attempt: 0,
+            captcha: None,
+        }
+    }
 }
 
 /// Como o servidor aceita pedidos parciais.

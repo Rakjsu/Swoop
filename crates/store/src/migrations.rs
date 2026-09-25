@@ -11,6 +11,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0001_init.sql"),
     include_str!("migrations/0002_settings.sql"),
     include_str!("migrations/0003_collector.sql"),
+    include_str!("migrations/0004_captcha_hosts.sql"),
 ];
 
 /// Leva o banco à última versão do esquema.

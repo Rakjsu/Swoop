@@ -4321,6 +4321,7 @@ dependencies = [
  "md-5",
  "proptest",
  "serde",
+ "serde_json",
  "sha2 0.11.0",
  "swoop-api",
  "swoop-core",

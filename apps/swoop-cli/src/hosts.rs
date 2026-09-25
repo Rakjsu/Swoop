@@ -83,7 +83,7 @@ pub async fn resolve(
 ) -> eyre::Result<i32> {
     let url = Url::parse(link.trim()).map_err(|_| eyre::eyre!("link inválido"))?;
     let reg = registry(data_dir, dump)?;
-    let req = ResolveRequest { url, attempt: 0 };
+    let req = ResolveRequest::new(url);
     match reg.resolve(&req).await {
         Ok(r) => {
             println!("servidor:  {}", r.host_key);

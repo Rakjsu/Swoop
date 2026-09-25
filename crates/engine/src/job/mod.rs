@@ -14,7 +14,8 @@ use crate::{probe, transfer};
 use async_speed_limit::Limiter;
 use std::sync::Arc;
 use swoop_core::{
-    DownloadId, Event, HostError, HttpFailure, ResolveRequest, Resolved, Resolver, Settings,
+    CaptchaAnswer, DownloadId, Event, HostError, HttpFailure, ResolveRequest, Resolved, Resolver,
+    Settings,
 };
 use swoop_net::reqwest;
 use swoop_store::{Store, downloads};
@@ -37,6 +38,8 @@ pub struct JobCtx {
     pub settings: Settings,
     /// Conexões liberadas pelo agendador (limite por servidor).
     pub granted_conns: u16,
+    /// Chave do servidor usada pelo agendador (esperas por servidor).
+    pub host: String,
     pub cancel: CancellationToken,
     pub progress: Arc<JobProgress>,
     pub events: broadcast::Sender<EngineEvent>,
@@ -56,10 +59,11 @@ async fn drive(ctx: &JobCtx, id: DownloadId) -> Result<u64, TransferError> {
         .await?
         .ok_or(TransferError::Cancelled)?;
     let url = Url::parse(&row.url).map_err(|_| TransferError::Fatal("link inválido".into()))?;
+    let mut captcha = captcha_answer(ctx, id).await?;
 
     let mut attempt = 0;
     loop {
-        let resolved = Arc::new(resolve(ctx, &url, attempt).await?);
+        let resolved = Arc::new(resolve(ctx, &url, attempt, captcha.take()).await?);
         let probe = match probe::probe(&ctx.client, &resolved).await {
             Ok(p) => p,
             Err(f) => match from_failure(ctx.resolver.as_ref(), &resolved.host_key, &f) {
@@ -109,11 +113,32 @@ async fn drive(ctx: &JobCtx, id: DownloadId) -> Result<u64, TransferError> {
     }
 }
 
+/// Resposta de captcha guardada para este download (vale uma vez).
+async fn captcha_answer(
+    ctx: &JobCtx,
+    id: DownloadId,
+) -> Result<Option<CaptchaAnswer>, TransferError> {
+    let stored = ctx
+        .store
+        .call(move |c| swoop_store::captcha::take_answer(c, id))
+        .await?;
+    Ok(stored.and_then(|(json, token)| {
+        let challenge = serde_json::from_str(&json).ok()?;
+        Some(CaptchaAnswer { challenge, token })
+    }))
+}
+
 /// Pede o link direto ao resolvedor e converte o erro.
-async fn resolve(ctx: &JobCtx, url: &Url, attempt: u32) -> Result<Resolved, TransferError> {
+async fn resolve(
+    ctx: &JobCtx,
+    url: &Url,
+    attempt: u32,
+    captcha: Option<CaptchaAnswer>,
+) -> Result<Resolved, TransferError> {
     let req = ResolveRequest {
         url: url.clone(),
         attempt,
+        captcha,
     };
     let host = url.host_str().unwrap_or_default().to_owned();
     let resolved = tokio::select! {
@@ -143,6 +168,7 @@ async fn resolve(ctx: &JobCtx, url: &Url, attempt: u32) -> Result<Resolved, Tran
         e @ (HostError::BrowserRequired(_) | HostError::AccessDenied) => {
             TransferError::Fatal(e.to_string())
         }
+        HostError::Captcha(challenge) => TransferError::Captcha(challenge),
     })
 }
 

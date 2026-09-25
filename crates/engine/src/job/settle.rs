@@ -8,7 +8,7 @@ use crate::{disk, verify};
 use std::time::{Duration, SystemTime};
 use swoop_core::{DownloadId, Event, Resolved, WaitReason};
 use swoop_store::history::{self, Outcome};
-use swoop_store::{StoreError, downloads, segments, to_ms};
+use swoop_store::{StoreError, captcha, downloads, host_state, segments, to_ms};
 
 /// Aviso para as interfaces quando algo muda num download.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,6 +19,8 @@ pub enum EngineEvent {
     Failed(DownloadId, String),
     /// Saiu sem mudar o estado (pausa ou encerramento).
     Stopped(DownloadId),
+    /// O servidor pediu captcha: espera o usuário.
+    CaptchaNeeded(DownloadId),
     /// A fila mudou (transição de estado, item removido, esperas vencidas):
     /// as interfaces recarregam a lista.
     Changed,
@@ -90,17 +92,22 @@ pub async fn settle(ctx: &JobCtx, id: DownloadId, result: Result<u64, TransferEr
         Err(e) => e,
     };
     let max_retries = ctx.settings.max_retries;
+    let host = ctx.host.clone();
     let outcome = ctx
         .store
-        .call(move |c| record(c, id, err, max_retries))
+        .call(move |c| record(c, id, &host, err, max_retries))
         .await;
     match outcome {
-        Ok(Some(message)) => {
+        Ok(Settled::Failed(message)) => {
             tracing::warn!(id = id.0, "falhou: {message}");
             let _ = ctx.events.send(EngineEvent::Failed(id, message));
         }
-        Ok(None) => {
+        Ok(Settled::Waiting) => {
             let _ = ctx.events.send(EngineEvent::Waiting(id));
+        }
+        Ok(Settled::Captcha) => {
+            tracing::info!(id = id.0, "captcha pendente");
+            let _ = ctx.events.send(EngineEvent::CaptchaNeeded(id));
         }
         Err(StoreError::Transition(_) | StoreError::NotFound(_)) => {
             let _ = ctx.events.send(EngineEvent::Stopped(id));
@@ -109,13 +116,22 @@ pub async fn settle(ctx: &JobCtx, id: DownloadId, result: Result<u64, TransferEr
     }
 }
 
-/// Espera (`Ok(None)`) ou falha definitiva (`Ok(Some(mensagem))`).
+/// Como a parada ficou gravada.
+enum Settled {
+    Waiting,
+    Captcha,
+    Failed(String),
+}
+
+/// Grava espera, captcha pendente ou falha definitiva. Espera de "limite do
+/// servidor" vale para o servidor inteiro (`host_state`).
 fn record(
     c: &mut swoop_store::Connection,
     id: DownloadId,
+    host: &str,
     err: TransferError,
     max_retries: u32,
-) -> Result<Option<String>, StoreError> {
+) -> Result<Settled, StoreError> {
     let (kind, message) = match err {
         TransferError::Wait {
             until,
@@ -123,7 +139,17 @@ fn record(
             message,
         } => {
             downloads::wait(c, id, to_ms(until), reason, Some(&message))?;
-            return Ok(None);
+            if reason == WaitReason::HostLimit {
+                host_state::set_wait(c, host, to_ms(until), reason)?;
+            }
+            return Ok(Settled::Waiting);
+        }
+        TransferError::Captcha(challenge) => {
+            let json = serde_json::to_string(&challenge)
+                .map_err(|e| StoreError::Corrupt(format!("captcha: {e}")))?;
+            captcha::set_challenge(c, id, &json)?;
+            downloads::transition(c, id, Event::NeedCaptcha)?;
+            return Ok(Settled::Captcha);
         }
         TransferError::Transient(message) => {
             let row = downloads::get(c, id)?.ok_or(StoreError::NotFound(id))?;
@@ -133,7 +159,7 @@ fn record(
                 let until = SystemTime::now() + RETRY_BASE * attempts;
                 let note = format!("{message} — nova tentativa {attempts}/{max_retries}");
                 downloads::wait(c, id, to_ms(until), WaitReason::Backoff, Some(&note))?;
-                return Ok(None);
+                return Ok(Settled::Waiting);
             }
             ("network", message)
         }
@@ -144,9 +170,9 @@ fn record(
         ),
         TransferError::Disk(m) => ("disk", format!("erro de disco: {m}")),
         TransferError::Fatal(m) => ("fatal", m),
-        TransferError::Cancelled => return Ok(None),
+        TransferError::Cancelled => return Ok(Settled::Waiting),
     };
     downloads::fail(c, id, Event::Fail, kind, &message)?;
     history::record(c, id, Outcome::Failed)?;
-    Ok(Some(message))
+    Ok(Settled::Failed(message))
 }
