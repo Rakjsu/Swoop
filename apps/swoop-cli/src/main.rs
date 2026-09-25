@@ -121,7 +121,7 @@ async fn main() -> eyre::Result<()> {
         }
         Command::List { common } => {
             let service = Service::open(common.options()).await?;
-            run::print_list(&service.list().await?);
+            run::print_list(&service.rows().await?);
             service.shutdown().await;
             0
         }

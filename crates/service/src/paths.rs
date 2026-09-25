@@ -8,10 +8,18 @@
 use std::path::PathBuf;
 use swoop_core::{APP_IDENTIFIER, APP_NAME, Settings};
 
+/// Pasta de dados pedida por `SWOOP_DATA_DIR` (tem prioridade em todo lugar:
+/// CLI, app e testes).
+pub fn data_dir_from_env() -> Option<PathBuf> {
+    std::env::var_os("SWOOP_DATA_DIR")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+}
+
 /// Pasta de dados (banco, trava, regras, logs).
 pub fn default_data_dir() -> PathBuf {
-    if let Some(dir) = std::env::var_os("SWOOP_DATA_DIR").filter(|v| !v.is_empty()) {
-        return PathBuf::from(dir);
+    if let Some(dir) = data_dir_from_env() {
+        return dir;
     }
     dirs::data_local_dir()
         .unwrap_or_else(std::env::temp_dir)

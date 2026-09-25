@@ -1,18 +1,24 @@
 //! Serviço do Swoop: abre a pasta de dados (com trava de instância única),
 //! o banco e o motor, e oferece as operações de alto nível usadas pelo CLI e,
-//! a partir da fase 2, pelo app desktop e pelo painel remoto.
+//! pela trait `swoop_api::Backend` (em `backend.rs`), pelo app desktop e pelo
+//! painel remoto.
 
+mod backend;
 mod paths;
 
-pub use paths::{default_data_dir, default_download_dir};
+pub use paths::{data_dir_from_env, default_data_dir, default_download_dir};
 
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use swoop_api::Push;
 use swoop_core::{DownloadId, DownloadState, Settings};
-use swoop_engine::{Engine, EngineConfig};
+use swoop_engine::{Engine, EngineConfig, EngineEvent};
 use swoop_hosts::DirectResolver;
 use swoop_store::{DownloadRow, Store, StoreError, downloads, packages};
+use tokio::sync::broadcast;
+use tokio::sync::broadcast::error::{RecvError, TryRecvError};
+use tokio::task::JoinHandle;
 use url::Url;
 
 /// Nome do arquivo do banco dentro da pasta de dados.
@@ -43,12 +49,17 @@ pub struct ServiceOptions {
     pub settings: Settings,
 }
 
-/// Serviço aberto. Solte com `shutdown` para gravar o último checkpoint.
+/// Serviço aberto. Chame `shutdown` antes de sair para gravar o último
+/// checkpoint.
 pub struct Service {
     store: Store,
     engine: Engine,
     data_dir: PathBuf,
     settings: Settings,
+    /// Avisos para as interfaces (`Push::Changed`).
+    pushes: broadcast::Sender<Push>,
+    /// Tarefa que traduz os eventos do motor em avisos.
+    forward: JoinHandle<()>,
     _lock: File,
 }
 
@@ -79,11 +90,15 @@ impl Service {
         )
         .map_err(|e| ServiceError::Http(e.to_string()))?;
         engine.start();
+        let (pushes, _) = broadcast::channel(64);
+        let forward = tokio::spawn(forward_events(engine.events(), pushes.clone()));
         Ok(Self {
             store,
             engine,
             data_dir,
             settings: opts.settings,
+            pushes,
+            forward,
             _lock: lock,
         })
     }
@@ -116,17 +131,23 @@ impl Service {
             })
             .await?;
         self.engine.wake();
+        let _ = self.pushes.send(Push::Changed);
         Ok(ids)
     }
 
     /// Todos os downloads na ordem da fila.
-    pub async fn list(&self) -> Result<Vec<DownloadRow>, ServiceError> {
+    pub async fn rows(&self) -> Result<Vec<DownloadRow>, ServiceError> {
         Ok(self.store.call(|c| downloads::list(c)).await?)
+    }
+
+    /// Um download pelo id (`None` se já saiu da fila).
+    pub async fn row(&self, id: DownloadId) -> Result<Option<DownloadRow>, ServiceError> {
+        Ok(self.store.call(move |c| downloads::get(c, id)).await?)
     }
 
     /// Downloads que ainda vão andar sozinhos (nem finais, nem pausados).
     pub async fn pending(&self) -> Result<usize, ServiceError> {
-        let rows = self.list().await?;
+        let rows = self.rows().await?;
         Ok(rows
             .iter()
             .filter(|r| !r.state.is_final() && r.state != DownloadState::Paused)
@@ -143,8 +164,25 @@ impl Service {
         &self.data_dir
     }
 
-    /// Para o motor esperando o último checkpoint de cada download.
-    pub async fn shutdown(self) {
+    /// Para o motor esperando o último checkpoint de cada download. Pode ser
+    /// chamado mais de uma vez; depois dele o serviço não baixa mais nada.
+    pub async fn shutdown(&self) {
         self.engine.shutdown().await;
+        self.forward.abort();
+    }
+}
+
+/// Traduz os eventos do motor em `Push::Changed`, juntando numa só as
+/// rajadas que chegam de uma vez. Perder eventos (`Lagged`) também vira
+/// "recarregue a lista".
+async fn forward_events(mut rx: broadcast::Receiver<EngineEvent>, tx: broadcast::Sender<Push>) {
+    loop {
+        match rx.recv().await {
+            Ok(_) | Err(RecvError::Lagged(_)) => {
+                while matches!(rx.try_recv(), Ok(_) | Err(TryRecvError::Lagged(_))) {}
+                let _ = tx.send(Push::Changed);
+            }
+            Err(RecvError::Closed) => return,
+        }
     }
 }

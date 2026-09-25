@@ -1,50 +1,40 @@
 import { useEffect, useState } from 'react';
 import { loadAppInfo, type AppInfo } from './appInfo';
+import { DownloadsView } from './downloads/DownloadsView';
+import { transport } from './transport';
 import { UpdateBanner } from './update/UpdateBanner';
 
-type InfoState =
-  | { kind: 'loading' }
-  | { kind: 'ready'; info: AppInfo }
-  | { kind: 'browser' }
-  | { kind: 'error'; message: string };
-
-/** Tela inicial da fase 0: confirma que UI e processo Rust conversam. */
+/** Casca do app: faixa de atualização, cabeçalho e a tela de downloads. */
 export function App() {
-  const [state, setState] = useState<InfoState>({ kind: 'loading' });
+  const [info, setInfo] = useState<AppInfo | null>(null);
 
   useEffect(() => {
     loadAppInfo()
-      .then((info) => setState(info ? { kind: 'ready', info } : { kind: 'browser' }))
-      .catch((err: unknown) =>
-        setState({ kind: 'error', message: err instanceof Error ? err.message : String(err) }),
-      );
+      .then(setInfo)
+      .catch((err: unknown) => console.error('app_info falhou', err));
   }, []);
 
   return (
-    <>
+    <div className="app">
       <UpdateBanner />
-      <main className="splash">
-        <img className="splash-logo" src="/logo.svg" alt="" width={112} height={112} />
-        <h1 className="splash-title">Swoop</h1>
-        <p className="splash-tagline">Seus downloads, num mergulho.</p>
-        <p className="splash-status" role="status">
-          {statusText(state)}
-        </p>
-      </main>
-    </>
+      <header className="app-header">
+        <img src="/logo.svg" alt="" width={26} height={26} />
+        <span className="app-title">Swoop</span>
+        {info && <span className="app-version">v{info.version}</span>}
+      </header>
+      {transport ? <DownloadsView transport={transport} /> : <BrowserNotice />}
+    </div>
   );
 }
 
-/** Texto de estado exibido abaixo do slogan. */
-function statusText(state: InfoState): string {
-  switch (state.kind) {
-    case 'loading':
-      return 'Conectando ao motor…';
-    case 'ready':
-      return `Versão ${state.info.version}`;
-    case 'browser':
-      return 'Aberto no navegador: o painel remoto chega na fase 2.';
-    case 'error':
-      return `Falha ao falar com o motor: ${state.message}`;
-  }
+/** Aberto num navegador comum: ainda não há painel web. */
+function BrowserNotice() {
+  return (
+    <main className="splash">
+      <img className="splash-logo" src="/logo.svg" alt="" width={96} height={96} />
+      <h1 className="splash-title">Swoop</h1>
+      <p className="splash-tagline">Seus downloads, num mergulho.</p>
+      <p className="splash-status">Abra pelo app instalado: o painel no navegador chega na v0.3.0.</p>
+    </main>
+  );
 }

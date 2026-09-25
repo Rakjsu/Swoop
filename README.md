@@ -32,15 +32,16 @@ O Swoop respeita as regras dos servidores:
 |---|---|---|
 | 0 ✅ | Esqueleto: workspace, CLI, app Tauri mínimo, UI, CI | CI verde (ubuntu + windows); janela abre no Windows ⏳ |
 | 1 ✅ | Motor de download com links diretos + CLI | 5 mortes + retomada, sha256 ok (128 MiB e 1 GiB); limite 2,03/5,02 MiB/s; conexão lenta 1,22× |
-| 2 | UI de downloads, `serve` em loopback, NSIS em Arquivos de Programas | Playwright verde; retoma após reabrir |
+| 2a ✅ | Tela de downloads: adicionar links, pausar/retomar/remover, limite, bandeja (v0.2.0) | testado no app real com o servidor de teste; retoma após reabrir |
+| 2b | Histórico, opções, notificações, painel no navegador (`serve`), Playwright (v0.3.0) | Playwright verde; 45–55 retratos em 10 s |
 | 3 | Pixeldrain, Mediafire, Google Drive + coletor de links | fixtures + downloads reais com hash |
 | 4 | Janela de captcha, fastfile.cc (XFS), contas premium | 3 downloads grátis seguidos; segredo fora do disco |
 | 5 | Extração com 7-Zip | RAR5 multiparte com senha; zip-slip bloqueado |
 | 6 | Mega e Gofile | MAC do Mega ok; retomar 1 GiB |
 | 7 | Área de transferência + extensão de navegador | link aparece em ≤ 1 s |
 | 8 | Controle remoto na rede local (QR) | painel no celular; segurança testada |
-| 9a ✅ | Instalador personalizado (estilo NeoStream) + atualização pelo GitHub (adiantado) | CI gera o instalador; release v0.1.0 publicada |
-| 9 | Autostart, agendador, desligar ao terminar, AppImage/deb | instala em `C:\Program Files\Swoop`; 0.1.0 → 0.1.1 |
+| 9a ✅ | Instalador personalizado (estilo NeoStream) + atualização pelo GitHub (adiantado) | release v0.1.0 instalada; 0.1.0 → 0.1.1 pela faixa ✅ |
+| 9 | Autostart, agendador, desligar ao terminar, AppImage/deb | Windows Sandbox limpo |
 
 Plano completo: [`docs/specs/2026-09-25-swoop-design.md`](docs/specs/2026-09-25-swoop-design.md).
 
@@ -78,29 +79,31 @@ Build de release do app:
 ```bash
 cd apps/swoop && ../../ui/node_modules/.bin/tauri build --no-bundle
 ```
-O binário sai em `target/release/swoop`. O instalador NSIS chega na fase 2.
+O binário sai em `target/release/swoop`. Instaladores: `scripts/build-release.ps1` (Windows).
+
+No app, o X da janela só esconde: os downloads continuam e o ícone da bandeja reabre, pausa/retoma tudo ou sai (gravando o progresso).
 
 ## Layout
 
 | Pasta | Conteúdo |
 |---|---|
 | `crates/core` | tipos de domínio e regras puras (estados, nomes seguros, contrato do resolvedor) |
-| `crates/api` | contrato entre o motor e as interfaces (desktop, painel, extensão) |
+| `crates/api` | contrato entre o motor e as interfaces: `Command`, `DownloadView`, `Snapshot`, trait `Backend`; gera os tipos TypeScript de `ui/src/gen` |
 | `crates/net` | cliente HTTP (rustls + ring, HTTP/1.1) e parsers de cabeçalhos |
 | `crates/store` | SQLite numa thread própria: fila, segmentos para retomada, histórico |
 | `crates/engine` | motor: agendador, segmentos com divisão dinâmica, escritora, limite de velocidade |
 | `crates/hosts` | plugins de servidores (fase 1: link direto) |
-| `crates/service` | liga banco + motor + plugins; trava de instância única |
+| `crates/service` | liga banco + motor + plugins; trava de instância única; implementa `Backend` |
 | `crates/testsrv` | servidor HTTP de teste com Range e falhas simuladas (só testes) |
 | `crates/update` | atualização pelas Releases do GitHub (consulta, download, sha256) |
 | `apps/swoop-installer` | instalador personalizado: janela própria que roda o setup NSIS em silêncio |
 | `scripts/build-release.ps1` | gera `dist/` (setup NSIS, instalador personalizado, SHA256SUMS) |
-| `apps/swoop` | app desktop Tauri (janela, comandos, permissões, ícones) |
+| `apps/swoop` | app desktop Tauri: comandos (`exec`, `list`, `subscribe` via Channel), bandeja, encerramento |
 | `apps/swoop-cli` | o mesmo motor sem janela |
-| `ui/` | interface React + TypeScript (a mesma para desktop e painel do celular) |
+| `ui/` | interface React + TypeScript: `transport/` (IPC do Tauri; HTTP na v0.3.0), `downloads/` (tela), `gen/` (tipos gerados, não editar) |
 | `docs/` | desenho e decisões |
 
-Os crates `extract` e `remote` chegam nas fases 5 e 2.
+Os crates `extract` e `remote` chegam na fase 5 e na v0.3.0.
 
 ## Desenvolvimento
 

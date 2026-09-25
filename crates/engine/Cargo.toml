@@ -8,6 +8,7 @@ rust-version.workspace = true
 
 [dependencies]
 swoop-core.workspace = true
+swoop-api.workspace = true
 swoop-net.workspace = true
 swoop-store.workspace = true
 async-speed-limit.workspace = true

@@ -1,10 +1,11 @@
 //! Progresso para as interfaces: contadores atômicos por download e o
-//! "retrato" agregado publicado algumas vezes por segundo.
+//! "retrato" agregado publicado algumas vezes por segundo (os tipos do
+//! retrato são os do contrato `swoop-api`, que a UI recebe como estão).
 
-use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Instant;
+use swoop_api::{LiveRow, Snapshot};
 use swoop_core::DownloadId;
 
 /// Contadores de um download ativo (escritos pelas conexões).
@@ -16,26 +17,6 @@ pub struct JobProgress {
     pub total: AtomicU64,
     /// Conexões abertas agora.
     pub conns: AtomicU32,
-}
-
-/// Linha de um download ativo no retrato.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct LiveRow {
-    pub id: DownloadId,
-    pub received: u64,
-    pub total: Option<u64>,
-    pub speed_bps: u64,
-    pub conns: u32,
-    pub eta_secs: Option<u64>,
-}
-
-/// Retrato do motor (4–5 por segundo).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
-pub struct Snapshot {
-    pub seq: u64,
-    pub speed_bps: u64,
-    pub limit_bps: Option<u64>,
-    pub active: Vec<LiveRow>,
 }
 
 /// Mede velocidade por download com média móvel exponencial.
@@ -80,7 +61,7 @@ impl SpeedMeter {
                 .filter(|_| speed_bps > 0)
                 .map(|t| t.saturating_sub(received) / speed_bps);
             active.push(LiveRow {
-                id: *id,
+                id: id.0,
                 received,
                 total,
                 speed_bps,

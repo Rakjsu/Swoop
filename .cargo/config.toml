@@ -1,0 +1,6 @@
+# Tipos TypeScript gerados pelo ts-rs ao rodar `cargo test -p swoop-api`
+# (a UI importa de `ui/src/gen`, commitado; o CI confere com `git diff`).
+# Inteiros de 64 bits viram `number`: bytes e ids cabem em 2^53.
+[env]
+TS_RS_EXPORT_DIR = { value = "ui/src/gen", relative = true }
+TS_RS_LARGE_INT = "number"

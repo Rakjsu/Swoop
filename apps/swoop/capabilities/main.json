@@ -1,7 +1,17 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Permissões da janela principal. Janelas de captcha (fase 4) não entram aqui: página de servidor nunca fala com o Rust.",
+  "description": "Permissões da janela principal. Janelas de captcha (fase 4) não entram aqui: página de servidor nunca fala com o Rust. O opener é usado só pelo Rust (reveal_download), sem permissão para o JS abrir URLs.",
   "windows": ["main"],
-  "permissions": ["core:default", "allow-app-info", "allow-update-status", "allow-install-update"]
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "allow-app-info",
+    "allow-exec",
+    "allow-list",
+    "allow-subscribe",
+    "allow-reveal-download",
+    "allow-update-status",
+    "allow-install-update"
+  ]
 }

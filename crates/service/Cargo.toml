@@ -7,11 +7,13 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+swoop-api.workspace = true
 swoop-core.workspace = true
 swoop-engine.workspace = true
 swoop-hosts.workspace = true
 swoop-net.workspace = true
 swoop-store.workspace = true
+async-trait.workspace = true
 dirs.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

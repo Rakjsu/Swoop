@@ -52,10 +52,13 @@ fn host_of(row: &DownloadRow) -> String {
 
 /// Inicia o que couber.
 async fn fill(inner: &Arc<Inner>) -> Result<(), swoop_store::StoreError> {
-    inner
+    let woken = inner
         .store
         .call(|c| downloads::wake_due(c, now_ms()))
         .await?;
+    if woken > 0 {
+        let _ = inner.events_tx.send(EngineEvent::Changed);
+    }
     let settings = inner.settings.lock().expect("mutex").clone();
     if free_slots(inner, &settings) == 0 {
         return Ok(());
@@ -107,8 +110,13 @@ fn grant_for(inner: &Inner, settings: &Settings, host: &str, id: DownloadId) -> 
     (left > 0).then(|| left.min(settings.connections_per_download).max(1))
 }
 
-/// Sobe a tarefa do job e registra como ativo.
+/// Sobe a tarefa do job e registra como ativo, a menos que o download esteja
+/// sendo removido (a trava do `active` cobre a checagem e o registro juntos).
 fn spawn_job(inner: &Arc<Inner>, settings: &Settings, id: DownloadId, host: String, grant: u16) {
+    let mut active = inner.active.lock().expect("mutex");
+    if inner.removing.lock().expect("mutex").contains(&id) {
+        return;
+    }
     let progress = Arc::new(JobProgress::default());
     let cancel = inner.shutdown.child_token();
     let ctx = JobCtx {
@@ -129,7 +137,7 @@ fn spawn_job(inner: &Arc<Inner>, settings: &Settings, id: DownloadId, host: Stri
         job::run(ctx, id).await;
         waker.wake.notify_one();
     });
-    inner.active.lock().expect("mutex").insert(
+    active.insert(
         id,
         Active {
             host,

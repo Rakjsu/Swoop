@@ -1,15 +1,19 @@
-//! Swoop desktop: janela Tauri que hospeda a UI React.
+//! Swoop desktop: janela Tauri que hospeda a UI React sobre o `swoop-service`.
 //!
-//! Expõe `app_info` e a atualização pelo GitHub (`update`); o motor, a bandeja
-//! e os demais comandos entram na fase 2 sobre o crate `swoop-service`.
+//! - `engine`: abre o serviço (banco + motor) e o encerra gravando o progresso;
+//! - `commands`: o que a UI chama via `invoke` (contrato `swoop-api`);
+//! - `tray`: ícone da bandeja; o X da janela só esconde, "Sair" encerra;
+//! - `update`: atualização pelo GitHub.
 
 // Sem console extra no Windows em release.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod engine;
+mod tray;
 mod update;
 
-use tauri::Manager;
+use tauri::{Manager, RunEvent, WindowEvent};
 use tracing_subscriber::EnvFilter;
 
 /// Liga os logs; o nível vem de `RUST_LOG` (padrão `info`).
@@ -18,35 +22,58 @@ fn init_tracing() {
     tracing_subscriber::fmt().with_env_filter(filter).init();
 }
 
-/// Traz a janela principal para a frente quando uma segunda instância é aberta.
-fn focus_main_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
-}
-
 fn main() {
     init_tracing();
     swoop_net::install_crypto_provider();
     tracing::info!("{} iniciando", swoop_core::version_line());
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         // Instância única precisa ser o primeiro plugin registrado.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            focus_main_window(app);
+            tray::show_main_window(app);
         }))
+        .plugin(tauri_plugin_dialog::init())
         .manage(update::UpdateState::default())
         .setup(|app| {
+            app.manage(engine::open(app.handle()));
+            let has_tray = match tray::create(app.handle()) {
+                Ok(()) => true,
+                Err(e) => {
+                    tracing::warn!("sem ícone na bandeja: {e}");
+                    false
+                }
+            };
+            app.manage(tray::TrayState {
+                available: has_tray,
+            });
             update::spawn_checker(app.handle().clone());
             Ok(())
         })
+        .on_window_event(|window, event| {
+            // Com a bandeja, fechar só esconde e os downloads continuam.
+            if let WindowEvent::CloseRequested { api, .. } = event
+                && window.state::<tray::TrayState>().available
+            {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
+            commands::exec,
+            commands::list,
+            commands::subscribe,
+            commands::reveal_download,
             update::update_status,
             update::install_update
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("falha ao iniciar o Swoop");
+
+    app.run(|app, event| {
+        // "Sair" da bandeja, fim da última janela e o atualizador passam aqui.
+        if let RunEvent::Exit = event {
+            engine::shutdown(app);
+        }
+    });
 }

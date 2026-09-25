@@ -33,6 +33,17 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: test
         run: cargo test --all-targets
+      # Os testes do swoop-api regeneram ui/src/gen (ts-rs): tem de sair igual
+      # ao commitado, senão a UI está usando tipos velhos.
+      - name: tipos TypeScript em dia (ui/src/gen)
+        if: runner.os == 'Linux'
+        run: |
+          if [ -n "$(git status --porcelain ui/src/gen)" ]; then
+            echo "::error::ui/src/gen desatualizado: rode 'cargo test -p swoop-api' e commite"
+            git status --porcelain ui/src/gen
+            git diff ui/src/gen
+            exit 1
+          fi
       - name: sem aws-lc-sys (build no Windows não pode exigir NASM)
         shell: bash
         run: |
