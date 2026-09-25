@@ -4,6 +4,7 @@
 //! painel remoto.
 
 mod backend;
+mod links;
 mod notices;
 mod paths;
 mod prefs;
@@ -16,12 +17,11 @@ use std::sync::Arc;
 use swoop_api::Push;
 use swoop_core::{DownloadId, DownloadState, Settings};
 use swoop_engine::{Engine, EngineConfig};
-use swoop_hosts::DirectResolver;
+use swoop_hosts::{Registry, Rules};
 use swoop_store::history::HistoryRow;
 use swoop_store::{DownloadRow, Store, StoreError, downloads, history, packages};
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
-use url::Url;
 
 /// Nome do arquivo do banco dentro da pasta de dados.
 const DB_FILE: &str = "swoop.sqlite";
@@ -60,6 +60,8 @@ pub struct ServiceOptions {
 pub struct Service {
     store: Store,
     engine: Engine,
+    /// Plugins dos servidores (também é o `Resolver` do motor).
+    hosts: Arc<Registry>,
     data_dir: PathBuf,
     /// Avisos para as interfaces (`Push::Changed`, `Push::Notice`).
     pushes: broadcast::Sender<Push>,
@@ -86,9 +88,11 @@ impl Service {
             tracing::info!("{recovered} download(s) interrompido(s) voltaram para a fila");
         }
         let settings = prefs::load(&store, opts.settings).await?;
+        let rules = Rules::for_data_dir(&data_dir);
+        let hosts = Arc::new(Registry::new(rules).map_err(|e| ServiceError::Http(e.to_string()))?);
         let engine = Engine::new(
             store.clone(),
-            Arc::new(DirectResolver),
+            hosts.clone(),
             EngineConfig {
                 settings,
                 user_agent: swoop_net::DEFAULT_USER_AGENT.to_owned(),
@@ -105,6 +109,7 @@ impl Service {
         Ok(Self {
             store,
             engine,
+            hosts,
             data_dir,
             pushes,
             forward,
@@ -112,22 +117,16 @@ impl Service {
         })
     }
 
-    /// Adiciona links num pacote novo. Com `dest`, tudo vai para lá; sem, a
-    /// pasta é automática por tipo (vídeos, músicas, downloads).
+    /// Adiciona links num pacote novo (pastas viram os seus arquivos). Com
+    /// `dest`, tudo vai para lá; sem, a pasta é automática por tipo (vídeos,
+    /// músicas, downloads).
     pub async fn add_links(
         &self,
         links: &[String],
         dest: Option<&Path>,
         package_name: &str,
     ) -> Result<Vec<DownloadId>, ServiceError> {
-        let urls: Vec<String> = links
-            .iter()
-            .map(|l| {
-                Url::parse(l.trim())
-                    .map(|u| u.to_string())
-                    .map_err(|_| ServiceError::BadLink(l.clone()))
-            })
-            .collect::<Result<_, _>>()?;
+        let urls = links::prepare(&self.hosts, links).await?;
         let auto = dest.is_none();
         let dest = dest
             .map(Path::to_path_buf)

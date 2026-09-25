@@ -5,7 +5,7 @@ pub mod client;
 pub mod headers;
 pub mod redact;
 
-pub use client::{DEFAULT_USER_AGENT, download_client, install_crypto_provider};
+pub use client::{DEFAULT_USER_AGENT, download_client, install_crypto_provider, page_client};
 pub use headers::{
     ContentRange, parse_content_disposition, parse_content_range, parse_retry_after,
 };

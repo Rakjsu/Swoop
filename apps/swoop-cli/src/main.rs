@@ -4,10 +4,13 @@
 //! - `resume`: continua o que ficou pela metade;
 //! - `list`: mostra a fila;
 //! - `serve`: painel no navegador (127.0.0.1) sobre o motor real;
+//! - `check`: confere links (online, nome, tamanho) sem baixar;
+//! - `resolve`: mostra o link direto e grava as respostas como fixtures;
 //! - `info`: nome e versão.
 //!
-//! `check`, `resolve` e `extract` chegam nas fases 3–5.
+//! `extract` chega na fase 5.
 
+mod hosts;
 mod run;
 mod serve;
 
@@ -53,6 +56,26 @@ enum Command {
     List {
         #[command(flatten)]
         common: Common,
+    },
+    /// Confere links sem baixar (aceita texto com links no meio)
+    Check {
+        /// Links ou texto com links
+        #[arg(required = true)]
+        texts: Vec<String>,
+        /// Pasta de dados (regras do usuário em rules/hosts.toml)
+        #[arg(long)]
+        data_dir: Option<PathBuf>,
+    },
+    /// Mostra o link direto de um arquivo
+    Resolve {
+        /// Link do arquivo
+        link: String,
+        /// Grava cada resposta lida nesta pasta (para virar fixture)
+        #[arg(long)]
+        dump_fixtures: Option<PathBuf>,
+        /// Pasta de dados (regras do usuário em rules/hosts.toml)
+        #[arg(long)]
+        data_dir: Option<PathBuf>,
     },
     /// Painel no navegador em 127.0.0.1 (imprime o endereço com o token)
     Serve {
@@ -134,6 +157,12 @@ async fn main() -> eyre::Result<()> {
             run::until_idle(service).await?
         }
         Command::Serve { ui, port, data_dir } => serve::serve(data_dir, ui, port).await?,
+        Command::Check { texts, data_dir } => hosts::check(&texts, data_dir).await?,
+        Command::Resolve {
+            link,
+            dump_fixtures,
+            data_dir,
+        } => hosts::resolve(&link, dump_fixtures, data_dir).await?,
         Command::List { common } => {
             let service = Service::open(common.options()).await?;
             run::print_list(&service.rows().await?);

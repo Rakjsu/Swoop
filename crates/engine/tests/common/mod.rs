@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use swoop_core::{DownloadId, DownloadState, PackageId, Settings};
+use swoop_core::{DownloadId, DownloadState, PackageId, Resolver, Settings};
 use swoop_engine::{Engine, EngineConfig};
 use swoop_hosts::DirectResolver;
 use swoop_store::{DownloadRow, Store, downloads, packages};
@@ -19,11 +19,17 @@ pub struct Harness {
     pub store: Store,
     pub dir: tempfile::TempDir,
     pub pkg: PackageId,
+    resolver: Arc<dyn Resolver>,
 }
 
 impl Harness {
     /// Motor novo com banco e pasta de destino temporários.
     pub async fn new(settings: Settings) -> Self {
+        Self::with_resolver(settings, Arc::new(DirectResolver)).await
+    }
+
+    /// Mesmo, com outro resolvedor (plugins de teste).
+    pub async fn with_resolver(settings: Settings, resolver: Arc<dyn Resolver>) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let store = Store::open(&dir.path().join("swoop.sqlite")).unwrap();
         let dest = dir.path().join("downloads");
@@ -31,12 +37,13 @@ impl Harness {
             .call(move |c| packages::insert(c, "teste", &dest, false))
             .await
             .unwrap();
-        let engine = start_engine(store.clone(), settings);
+        let engine = start_engine(store.clone(), resolver.clone(), settings);
         Self {
             engine,
             store,
             dir,
             pkg,
+            resolver,
         }
     }
 
@@ -47,7 +54,7 @@ impl Harness {
             .call(|c| downloads::recover_all(c))
             .await
             .unwrap();
-        self.engine = start_engine(self.store.clone(), settings);
+        self.engine = start_engine(self.store.clone(), self.resolver.clone(), settings);
     }
 
     /// Põe um link na fila.
@@ -106,10 +113,10 @@ impl Harness {
     }
 }
 
-fn start_engine(store: Store, settings: Settings) -> Engine {
+fn start_engine(store: Store, resolver: Arc<dyn Resolver>, settings: Settings) -> Engine {
     let engine = Engine::new(
         store,
-        Arc::new(DirectResolver),
+        resolver,
         EngineConfig {
             settings,
             user_agent: "swoop-teste".into(),

@@ -20,6 +20,17 @@ pub enum WaitReason {
 }
 
 impl WaitReason {
+    /// Explicação curta para a interface.
+    pub fn describe(self) -> &'static str {
+        match self {
+            Self::Countdown => "contador do servidor",
+            Self::HostLimit => "limite do servidor",
+            Self::Quota => "cota do servidor esgotada (muitos downloads recentes)",
+            Self::Backoff => "nova tentativa depois de um erro",
+            Self::Schedule => "fora do horário do agendador",
+        }
+    }
+
     /// Nome estável usado no banco.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -63,6 +74,13 @@ pub enum HostError {
     Http(u16),
     #[error("link não suportado")]
     Unsupported,
+    /// O servidor quer o navegador (captcha, aviso de arquivo perigoso,
+    /// senha). Nunca é contornado: na fase 4 abre a janela do app para o
+    /// usuário decidir. A mensagem já diz o que houve.
+    #[error("{0}")]
+    BrowserRequired(String),
+    #[error("o arquivo é privado ou exige login")]
+    AccessDenied,
 }
 
 /// Falha de uma requisição durante o download (dados mínimos para classificar).

@@ -21,6 +21,10 @@ fases com portões está em `docs/specs/2026-09-25-swoop-design.md`: ler antes d
   - motor, dentro do processo (b–f): `cargo test -p swoop-engine --test download -- --nocapture`
   - matar e retomar (a): `cargo test -p swoop-cli --test kill_resume -- --nocapture`
   - versão de 1 GiB: `cargo test --release -p swoop-cli --test kill_resume -- --ignored --nocapture`
+- **Servidores (fase 3):**
+  - conferir/resolver sem banco: `cargo run -p swoop-cli -- check <links ou texto>` · `resolve <link> --dump-fixtures <pasta>` (grava só corpos, nunca cabeçalhos; revisar antes de commitar como fixture)
+  - portão (d), link expirando: `cargo test -p swoop-engine --test reresolve -- --nocapture`
+  - rede (links públicos; trocáveis por `SWOOP_TEST_*`): `cargo test -p swoop-hosts --test network -- --ignored --test-threads=1 --nocapture` e `cargo test -p swoop-engine --test network -- --ignored --test-threads=1 --nocapture`. Na nuvem o proxy bloqueia os sites até o dono liberar os domínios.
 - **Checagem para Windows sem Windows:** `rustup target add x86_64-pc-windows-gnu`, `apt install gcc-mingw-w64-x86-64`, depois `cargo clippy --target x86_64-pc-windows-gnu --all-targets -- -D warnings`
 - **Linux sem display (nuvem):** `xvfb-run -a ./target/release/swoop`. Print com `import -window root x.png`.
 
@@ -61,8 +65,13 @@ fases com portões está em `docs/specs/2026-09-25-swoop-design.md`: ler antes d
 - **Checkpoint:** a cada 500 ms ou 8 MiB, sempre `sync_data` antes do SQLite. O banco nunca afirma bytes que não estão no disco.
 - **Testes com `TestServer`:** usar `#[tokio::test(flavor = "multi_thread")]`. Para medir conexões simultâneas, limitar a taxa (`rate=`), senão no loopback uma conexão termina antes da outra abrir.
 - **`tsc`:** TypeScript 7 (nativo) ainda não é suportado pelo typescript-eslint; manter `~6.0`.
+- **Plugins (`crates/hosts`):** `<servidor>/parse.rs` é puro e testado com fixtures em `crates/hosts/tests/fixtures/<servidor>/`; `mod.rs` só faz rede. Seletor, endereço ou texto de página vai em `rules/hosts.toml` (o usuário sobrescreve em `<dados>/rules/hosts.toml`), nunca fixo no código.
+- **Leitura de página:** sempre por `page::get`/`page::read_body` — detecta quando o "link da página" já entrega o arquivo (o Mediafire faz isso com alguns links) e corta em 4 MiB. `res.text()` direto baixaria o arquivo inteiro para a memória.
+- **Erro de rede do reqwest:** `page::network` usa `without_url()` e só as causas internas; o `Display` do próprio erro traz a URL.
+- **`HostError::BrowserRequired`:** a mensagem é mostrada como está, então diz o servidor e o que fazer ("o Mediafire pediu captcha; abra o link no navegador").
+- **Pasta do Drive:** a página `embeddedfolderview` é lida por todos os `<a href>` (como o gdown), sem depender de classe; Docs/Planilhas nativos são ignorados.
 
 ## Nunca
-- Burlar espera, cota ou captcha de servidor, ou trocar IP para fugir de limite.
+- Burlar espera, cota ou captcha de servidor, ou trocar IP para fugir de limite. Isso inclui o "baixar assim mesmo" do aviso de arquivo perigoso do Mediafire: a decisão é do usuário, no navegador.
 - Commitar `.env`, token, chave de API ou senha de conta premium.
 - Guardar segredo de conta no SQLite (vai para o cofre do SO via `keyring`).
