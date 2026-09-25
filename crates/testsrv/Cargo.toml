@@ -1,0 +1,26 @@
+[package]
+name = "swoop-testsrv"
+description = "Servidor HTTP de teste do Swoop: Range, conteúdo determinístico e botões de falha"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "swoop-testsrv"
+path = "src/main.rs"
+
+[dependencies]
+axum.workspace = true
+bytes.workspace = true
+futures-util.workspace = true
+hex.workspace = true
+httpdate.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+swoop-net.workspace = true

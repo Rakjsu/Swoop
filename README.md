@@ -20,8 +20,8 @@ O Swoop respeita as regras dos servidores:
 
 | Fase | Entrega | Portão |
 |---|---|---|
-| 0 | Esqueleto: workspace, CLI, app Tauri mínimo, UI, CI | CI verde; janela abre no Windows ⏳ |
-| 1 | Motor de download com links diretos + CLI | matar/retomar com sha256 ok; limite de velocidade ±10% |
+| 0 ✅ | Esqueleto: workspace, CLI, app Tauri mínimo, UI, CI | CI verde (ubuntu + windows); janela abre no Windows ⏳ |
+| 1 ✅ | Motor de download com links diretos + CLI | 5 mortes + retomada, sha256 ok (128 MiB e 1 GiB); limite 2,03/5,02 MiB/s; conexão lenta 1,22× |
 | 2 | UI de downloads, `serve` em loopback, NSIS em Arquivos de Programas | Playwright verde; retoma após reabrir |
 | 3 | Pixeldrain, Mediafire, Google Drive + coletor de links | fixtures + downloads reais com hash |
 | 4 | Janela de captcha, fastfile.cc (XFS), contas premium | 3 downloads grátis seguidos; segredo fora do disco |
@@ -48,8 +48,19 @@ cd ui && npm install && cd ..
 # app desktop em modo dev (identificador separado do instalado)
 cd apps/swoop && ../../ui/node_modules/.bin/tauri dev --config tauri.dev.conf.json
 
-# CLI (sem janela)
-cargo run -p swoop-cli -- --version
+# CLI (sem janela): baixa com 8 conexões e limite de 2 MiB/s
+cargo run --release -p swoop-cli -- get "https://exemplo.com/arquivo.zip" --connections 8 --limit 2M
+cargo run --release -p swoop-cli -- resume      # continua o que ficou pela metade
+cargo run --release -p swoop-cli -- list        # mostra a fila
+```
+
+Ctrl+C grava o progresso antes de sair; matar o processo perde no máximo o último meio segundo.
+Pasta de dados: `SWOOP_DATA_DIR` ou `%LOCALAPPDATA%\io.github.rakjsu.swoop` (Windows).
+Destino padrão: `Downloads/Swoop`.
+
+Servidor de teste local (arquivo de tamanho e sha256 conhecidos, para ensaios):
+```bash
+cargo run --release -p swoop-testsrv -- 8765
 ```
 
 Build de release do app:
@@ -62,14 +73,20 @@ O binário sai em `target/release/swoop`. O instalador NSIS chega na fase 2.
 
 | Pasta | Conteúdo |
 |---|---|
-| `crates/core` | tipos de domínio e regras puras (sem I/O) |
+| `crates/core` | tipos de domínio e regras puras (estados, nomes seguros, contrato do resolvedor) |
 | `crates/api` | contrato entre o motor e as interfaces (desktop, painel, extensão) |
+| `crates/net` | cliente HTTP (rustls + ring, HTTP/1.1) e parsers de cabeçalhos |
+| `crates/store` | SQLite numa thread própria: fila, segmentos para retomada, histórico |
+| `crates/engine` | motor: agendador, segmentos com divisão dinâmica, escritora, limite de velocidade |
+| `crates/hosts` | plugins de servidores (fase 1: link direto) |
+| `crates/service` | liga banco + motor + plugins; trava de instância única |
+| `crates/testsrv` | servidor HTTP de teste com Range e falhas simuladas (só testes) |
 | `apps/swoop` | app desktop Tauri (janela, comandos, permissões, ícones) |
 | `apps/swoop-cli` | o mesmo motor sem janela |
 | `ui/` | interface React + TypeScript (a mesma para desktop e painel do celular) |
 | `docs/` | desenho e decisões |
 
-Os crates `store`, `net`, `engine`, `hosts`, `extract`, `service`, `remote` e `testsrv` chegam nas fases seguintes.
+Os crates `extract` e `remote` chegam nas fases 5 e 2.
 
 ## Desenvolvimento
 

@@ -1,0 +1,14 @@
+[package]
+name = "swoop-net"
+description = "Cliente HTTP do Swoop e parsers de cabeçalhos (Content-Range, Content-Disposition, Retry-After)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+httpdate.workspace = true
+percent-encoding.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+url.workspace = true

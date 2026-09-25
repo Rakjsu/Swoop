@@ -1,0 +1,22 @@
+[package]
+name = "swoop-service"
+description = "Liga banco, motor e plugins do Swoop (usado pelo CLI e pelo app desktop)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+swoop-core.workspace = true
+swoop-engine.workspace = true
+swoop-hosts.workspace = true
+swoop-net.workspace = true
+swoop-store.workspace = true
+dirs.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

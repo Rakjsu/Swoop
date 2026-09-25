@@ -1,14 +1,15 @@
 [package]
-name = "swoop-core"
-description = "Tipos de domínio e regras puras do Swoop (sem I/O)"
+name = "swoop-hosts"
+description = "Plugins de servidores do Swoop (fase 1: só link direto)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+swoop-core.workspace = true
 async-trait.workspace = true
-percent-encoding.workspace = true
-serde.workspace = true
-thiserror.workspace = true
 url.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
