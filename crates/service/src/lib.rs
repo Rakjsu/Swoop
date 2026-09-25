@@ -4,7 +4,9 @@
 //! painel remoto.
 
 mod backend;
+mod notices;
 mod paths;
+mod prefs;
 
 pub use paths::{data_dir_from_env, default_data_dir, default_download_dir};
 
@@ -13,11 +15,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use swoop_api::Push;
 use swoop_core::{DownloadId, DownloadState, Settings};
-use swoop_engine::{Engine, EngineConfig, EngineEvent};
+use swoop_engine::{Engine, EngineConfig};
 use swoop_hosts::DirectResolver;
-use swoop_store::{DownloadRow, Store, StoreError, downloads, packages};
+use swoop_store::history::HistoryRow;
+use swoop_store::{DownloadRow, Store, StoreError, downloads, history, packages};
 use tokio::sync::broadcast;
-use tokio::sync::broadcast::error::{RecvError, TryRecvError};
 use tokio::task::JoinHandle;
 use url::Url;
 
@@ -39,6 +41,8 @@ pub enum ServiceError {
     Http(String),
     #[error("link inválido: {0}")]
     BadLink(String),
+    #[error("preferências inválidas: {0}")]
+    BadSettings(String),
 }
 
 /// Como abrir o serviço.
@@ -46,7 +50,9 @@ pub enum ServiceError {
 pub struct ServiceOptions {
     /// Pasta de dados; `None` = `SWOOP_DATA_DIR` ou a pasta padrão do SO.
     pub data_dir: Option<PathBuf>,
-    pub settings: Settings,
+    /// Preferências explícitas (CLI), que não são salvas; `None` = as salvas
+    /// no banco (app, painel).
+    pub settings: Option<Settings>,
 }
 
 /// Serviço aberto. Chame `shutdown` antes de sair para gravar o último
@@ -55,8 +61,7 @@ pub struct Service {
     store: Store,
     engine: Engine,
     data_dir: PathBuf,
-    settings: Settings,
-    /// Avisos para as interfaces (`Push::Changed`).
+    /// Avisos para as interfaces (`Push::Changed`, `Push::Notice`).
     pushes: broadcast::Sender<Push>,
     /// Tarefa que traduz os eventos do motor em avisos.
     forward: JoinHandle<()>,
@@ -80,31 +85,35 @@ impl Service {
         if recovered > 0 {
             tracing::info!("{recovered} download(s) interrompido(s) voltaram para a fila");
         }
+        let settings = prefs::load(&store, opts.settings).await?;
         let engine = Engine::new(
             store.clone(),
             Arc::new(DirectResolver),
             EngineConfig {
-                settings: opts.settings.clone(),
+                settings,
                 user_agent: swoop_net::DEFAULT_USER_AGENT.to_owned(),
             },
         )
         .map_err(|e| ServiceError::Http(e.to_string()))?;
         engine.start();
         let (pushes, _) = broadcast::channel(64);
-        let forward = tokio::spawn(forward_events(engine.events(), pushes.clone()));
+        let forward = tokio::spawn(notices::forward(
+            engine.events(),
+            store.clone(),
+            pushes.clone(),
+        ));
         Ok(Self {
             store,
             engine,
             data_dir,
-            settings: opts.settings,
             pushes,
             forward,
             _lock: lock,
         })
     }
 
-    /// Adiciona links num pacote novo com destino `dest` (padrão: pasta de
-    /// downloads das preferências).
+    /// Adiciona links num pacote novo. Com `dest`, tudo vai para lá; sem, a
+    /// pasta é automática por tipo (vídeos, músicas, downloads).
     pub async fn add_links(
         &self,
         links: &[String],
@@ -119,14 +128,15 @@ impl Service {
                     .map_err(|_| ServiceError::BadLink(l.clone()))
             })
             .collect::<Result<_, _>>()?;
+        let auto = dest.is_none();
         let dest = dest
             .map(Path::to_path_buf)
-            .unwrap_or_else(|| default_download_dir(&self.settings));
+            .unwrap_or_else(|| default_download_dir(&self.engine.settings()));
         let name = package_name.to_owned();
         let ids = self
             .store
             .call(move |c| {
-                let pkg = packages::insert(c, &name, &dest)?;
+                let pkg = packages::insert(c, &name, &dest, auto)?;
                 urls.iter().map(|u| downloads::insert(c, pkg, u)).collect()
             })
             .await?;
@@ -147,11 +157,33 @@ impl Service {
 
     /// Downloads que ainda vão andar sozinhos (nem finais, nem pausados).
     pub async fn pending(&self) -> Result<usize, ServiceError> {
-        let rows = self.rows().await?;
-        Ok(rows
-            .iter()
-            .filter(|r| !r.state.is_final() && r.state != DownloadState::Paused)
-            .count())
+        Ok(pending_in(&self.rows().await?))
+    }
+
+    /// As `limit` entradas mais recentes do histórico.
+    pub async fn history(&self, limit: u32) -> Result<Vec<HistoryRow>, ServiceError> {
+        Ok(self.store.call(move |c| history::list(c, limit)).await?)
+    }
+
+    /// Preferências em uso.
+    pub fn settings(&self) -> Settings {
+        self.engine.settings()
+    }
+
+    /// Valida, salva e aplica as preferências.
+    pub async fn save_settings(&self, settings: Settings) -> Result<(), ServiceError> {
+        let settings = prefs::save(&self.store, settings).await?;
+        self.engine.update_settings(settings);
+        let _ = self.pushes.send(Push::Changed);
+        Ok(())
+    }
+
+    /// Troca o limite global na hora e salva.
+    pub async fn set_speed_limit(&self, bps: Option<u64>) -> Result<(), ServiceError> {
+        let bps = bps.filter(|b| *b > 0);
+        self.engine.set_speed_limit(bps);
+        prefs::save(&self.store, self.engine.settings()).await?;
+        Ok(())
     }
 
     /// O motor (pausar, retomar, limite, progresso, eventos).
@@ -172,17 +204,9 @@ impl Service {
     }
 }
 
-/// Traduz os eventos do motor em `Push::Changed`, juntando numa só as
-/// rajadas que chegam de uma vez. Perder eventos (`Lagged`) também vira
-/// "recarregue a lista".
-async fn forward_events(mut rx: broadcast::Receiver<EngineEvent>, tx: broadcast::Sender<Push>) {
-    loop {
-        match rx.recv().await {
-            Ok(_) | Err(RecvError::Lagged(_)) => {
-                while matches!(rx.try_recv(), Ok(_) | Err(TryRecvError::Lagged(_))) {}
-                let _ = tx.send(Push::Changed);
-            }
-            Err(RecvError::Closed) => return,
-        }
-    }
+/// Quantos ainda vão andar sozinhos (nem finais, nem pausados).
+fn pending_in(rows: &[DownloadRow]) -> usize {
+    rows.iter()
+        .filter(|r| !r.state.is_final() && r.state != DownloadState::Paused)
+        .count()
 }

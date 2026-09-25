@@ -1,7 +1,7 @@
 {
   "name": "swoop-ui",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Interface do Swoop: a mesma UI serve a janela desktop (Tauri) e o painel web do celular",
   "scripts": {
@@ -10,7 +10,8 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@tauri-apps/cli": "^2.11.5",
     "@types/node": "^26.5.1",
     "@types/react": "^19.3.0",

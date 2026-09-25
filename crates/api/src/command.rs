@@ -4,6 +4,7 @@
 //! ficar simples do lado TypeScript.
 
 use serde::{Deserialize, Serialize};
+use swoop_core::Settings;
 use ts_rs::TS;
 
 /// Pedido da interface. No JSON: `{ "type": "pause", "id": 3 }`.
@@ -36,10 +37,15 @@ pub enum Command {
     },
     PauseAll,
     ResumeAll,
-    /// Limite global em bytes/s; ausente = sem limite.
+    /// Limite global em bytes/s; ausente = sem limite. Fica salvo.
     SetSpeedLimit {
         #[ts(optional)]
         bps: Option<u64>,
+    },
+    /// Grava as preferências e aplica na hora (limite, simultâneos…); as de
+    /// conexões valem para os próximos downloads iniciados.
+    SaveSettings {
+        settings: Settings,
     },
 }
 

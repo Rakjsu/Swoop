@@ -15,6 +15,7 @@ swoop-net.workspace = true
 swoop-store.workspace = true
 async-trait.workspace = true
 dirs.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
@@ -22,3 +23,4 @@ url.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+swoop-testsrv.workspace = true

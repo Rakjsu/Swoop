@@ -26,6 +26,8 @@ function ensureSubscribed(): void {
 export const tauriTransport: Transport = {
   exec: (cmd) => invoke('exec', { cmd }),
   list: () => invoke('list'),
+  history: (limit) => invoke('history', { limit }),
+  settings: () => invoke('settings'),
   onPush(listener) {
     listeners.add(listener);
     ensureSubscribed();

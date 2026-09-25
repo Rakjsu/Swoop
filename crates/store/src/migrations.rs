@@ -7,7 +7,10 @@
 use crate::StoreError;
 use rusqlite::Connection;
 
-const MIGRATIONS: &[&str] = &[include_str!("migrations/0001_init.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("migrations/0001_init.sql"),
+    include_str!("migrations/0002_settings.sql"),
+];
 
 /// Leva o banco à última versão do esquema.
 pub(crate) fn run(conn: &mut Connection) -> Result<(), StoreError> {

@@ -9,6 +9,8 @@ fn main() {
         "app_info",
         "exec",
         "list",
+        "history",
+        "settings",
         "subscribe",
         "reveal_download",
         "update_status",

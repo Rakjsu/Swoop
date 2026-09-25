@@ -4,11 +4,13 @@
 //! - `resolved`/`resolver`: o contrato entre plugins de servidor e o motor.
 //! - `error`: erros de servidor e a classificação de falhas HTTP.
 //! - `filename`: nomes de arquivo seguros vindos de servidores.
+//! - `kind`: vídeo, áudio ou outro, para a pasta automática.
 //! - `settings`/`units`: preferências e conversão de tamanhos.
 
 pub mod error;
 pub mod filename;
 pub mod ids;
+pub mod kind;
 pub mod resolved;
 pub mod resolver;
 pub mod settings;
@@ -17,6 +19,7 @@ pub mod units;
 
 pub use error::{ErrorClass, HostError, HttpFailure, WaitReason, default_classify};
 pub use ids::{DownloadId, PackageId};
+pub use kind::{FileKind, file_kind};
 pub use resolved::{Integrity, RangeStyle, ResolveRequest, Resolved};
 pub use resolver::Resolver;
 pub use settings::Settings;

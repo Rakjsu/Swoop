@@ -65,6 +65,32 @@ body {
   color: var(--text-dim);
 }
 
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: 24px;
+}
+
+.tab {
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-dim);
+  background: transparent;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab-active {
+  color: var(--text);
+  background: var(--surface);
+}
+
 .splash {
   flex: 1;
   display: flex;

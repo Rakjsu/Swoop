@@ -11,6 +11,7 @@ pub mod history;
 mod migrations;
 pub mod packages;
 pub mod segments;
+pub mod settings;
 
 pub use actor::Store;
 pub use downloads::DownloadRow;

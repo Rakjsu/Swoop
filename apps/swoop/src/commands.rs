@@ -5,7 +5,9 @@
 
 use crate::engine::EngineState;
 use std::path::PathBuf;
-use swoop_api::{ApiError, AppInfo, Backend, Command, DownloadView, Push, Reply};
+use swoop_api::{
+    ApiError, AppInfo, Backend, Command, DownloadView, HistoryView, Push, Reply, Settings,
+};
 use swoop_core::DownloadId;
 use tauri::State;
 use tauri::ipc::Channel;
@@ -26,6 +28,21 @@ pub async fn exec(state: State<'_, EngineState>, cmd: Command) -> Result<Reply, 
 #[tauri::command]
 pub async fn list(state: State<'_, EngineState>) -> Result<Vec<DownloadView>, ApiError> {
     state.service()?.list().await
+}
+
+/// As `limit` entradas mais recentes do histórico.
+#[tauri::command]
+pub async fn history(
+    state: State<'_, EngineState>,
+    limit: u32,
+) -> Result<Vec<HistoryView>, ApiError> {
+    Backend::history(state.service()?.as_ref(), limit).await
+}
+
+/// Preferências em uso (tela de Opções).
+#[tauri::command]
+pub async fn settings(state: State<'_, EngineState>) -> Result<Settings, ApiError> {
+    Backend::settings(state.service()?.as_ref()).await
 }
 
 /// Passa a empurrar retratos (≈5 Hz) e avisos para a UI pelo canal. Só uma

@@ -14,7 +14,8 @@ mod view;
 
 pub use backend::{ApiError, Backend, Subscription};
 pub use command::{Command, Reply};
-pub use view::{DownloadView, LiveRow, Push, Snapshot};
+pub use swoop_core::Settings;
+pub use view::{DownloadView, HistoryOutcome, HistoryView, LiveRow, Notice, Push, Snapshot};
 
 use serde::Serialize;
 use ts_rs::TS;

@@ -3,6 +3,7 @@
 //! - `engine`: abre o serviço (banco + motor) e o encerra gravando o progresso;
 //! - `commands`: o que a UI chama via `invoke` (contrato `swoop-api`);
 //! - `tray`: ícone da bandeja; o X da janela só esconde, "Sair" encerra;
+//! - `notify`: notificações do sistema (fila terminou, falhou);
 //! - `update`: atualização pelo GitHub.
 
 // Sem console extra no Windows em release.
@@ -10,6 +11,7 @@
 
 mod commands;
 mod engine;
+mod notify;
 mod tray;
 mod update;
 
@@ -33,9 +35,14 @@ fn main() {
             tray::show_main_window(app);
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(update::UpdateState::default())
         .setup(|app| {
-            app.manage(engine::open(app.handle()));
+            let state = engine::open(app.handle());
+            if let Ok(service) = state.service() {
+                notify::spawn(app.handle().clone(), service.clone());
+            }
+            app.manage(state);
             let has_tray = match tray::create(app.handle()) {
                 Ok(()) => true,
                 Err(e) => {
@@ -62,6 +69,8 @@ fn main() {
             commands::app_info,
             commands::exec,
             commands::list,
+            commands::history,
+            commands::settings,
             commands::subscribe,
             commands::reveal_download,
             update::update_status,

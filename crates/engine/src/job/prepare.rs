@@ -8,11 +8,12 @@ use crate::probe::Probe;
 use crate::segments::{Span, plan};
 use crate::table::Table;
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use swoop_core::filename::choose_file_name;
-use swoop_core::{DownloadId, Resolved};
+use swoop_core::{DownloadId, Resolved, file_kind};
 use swoop_store::downloads::{DownloadRow, ProbeInfo};
+use swoop_store::packages::PackageRow;
 use swoop_store::{SegmentRow, StoreError, downloads, packages, segments};
 
 /// Onde o arquivo está sendo gravado e como vai se chamar.
@@ -39,12 +40,12 @@ pub async fn prepare(
     resolved: &Resolved,
     probe: &Probe,
 ) -> Result<Prepared, TransferError> {
-    let (row, dest_dir, stored) = ctx
+    let (row, pkg, stored) = ctx
         .store
         .call(move |c| {
             let row = downloads::get(c, id)?.ok_or(StoreError::NotFound(id))?;
             let pkg = packages::get(c, row.package_id)?.ok_or(StoreError::NotFound(id))?;
-            Ok((row, pkg.dest_dir, segments::load(c, id)?))
+            Ok((row, pkg, segments::load(c, id)?))
         })
         .await?;
 
@@ -58,8 +59,14 @@ pub async fn prepare(
         .min(ctx.granted_conns)
         .max(1);
 
-    let (file_name, part) = match (reuse, &row.file_name, &row.part_path) {
-        (true, Some(name), Some(part)) => (name.clone(), part.clone()),
+    let (file_name, part, dest_dir) = match (reuse, &row.file_name, &row.part_path) {
+        // Retomada: o arquivo termina na pasta onde começou.
+        (true, Some(name), Some(part)) => {
+            let dir = part
+                .parent()
+                .map_or_else(|| pkg.dest_dir.clone(), Path::to_path_buf);
+            (name.clone(), part.clone(), dir)
+        }
         _ => {
             if let Some(old) = &row.part_path {
                 let _ = std::fs::remove_file(old);
@@ -69,8 +76,9 @@ pub async fn prepare(
                 probe.disposition_name.as_deref(),
                 &resolved.url,
             );
-            let part = disk::unique_path(&dest_dir, &format!("{name}.part"));
-            (name, part)
+            let dir = dest_dir_for(ctx, &pkg, &name);
+            let part = disk::unique_path(&dir, &format!("{name}.part"));
+            (name, part, dir)
         }
     };
 
@@ -137,6 +145,17 @@ pub async fn prepare(
             file_name,
         },
     })
+}
+
+/// Pasta do arquivo: a do pacote, ou, com pasta automática, a do tipo do
+/// arquivo (vídeos, músicas, downloads) pelas preferências.
+fn dest_dir_for(ctx: &JobCtx, pkg: &PackageRow, file_name: &str) -> PathBuf {
+    if !pkg.auto_dest {
+        return pkg.dest_dir.clone();
+    }
+    ctx.settings
+        .dir_for(file_kind(file_name))
+        .map_or_else(|| pkg.dest_dir.clone(), Path::to_path_buf)
 }
 
 /// O `.part` anterior ainda vale? Mesmo tamanho, mesmos validadores e o

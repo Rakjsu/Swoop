@@ -1,0 +1,28 @@
+[package]
+name = "swoop-remote"
+description = "Painel do Swoop no navegador: arquivos da UI + API HTTP/WebSocket, só em 127.0.0.1 e com token"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+swoop-api.workspace = true
+axum.workspace = true
+getrandom.workspace = true
+hex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+swoop-net.workspace = true
+swoop-service.workspace = true
+swoop-testsrv.workspace = true
+futures-util.workspace = true
+tempfile.workspace = true
+tokio-tungstenite.workspace = true

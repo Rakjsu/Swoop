@@ -8,10 +8,10 @@ use swoop_core::{DownloadState, PackageId, Settings};
 async fn open(dir: &tempfile::TempDir) -> Service {
     Service::open(ServiceOptions {
         data_dir: Some(dir.path().join("dados")),
-        settings: Settings {
+        settings: Some(Settings {
             download_dir: Some(dir.path().join("baixados")),
             ..Settings::default()
-        },
+        }),
     })
     .await
     .unwrap()
