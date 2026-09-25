@@ -20,7 +20,7 @@ fases com portões está em `docs/specs/2026-09-25-swoop-design.md`: ler antes d
 - **Linux sem display (nuvem):** `xvfb-run -a ./target/release/swoop`. Print com `import -window root x.png`.
 
 ## Publicar versão
-- Subir `version` em `[workspace.package]` do `Cargo.toml`, fazer o merge na `main` e rodar `git tag vX.Y.Z && git push origin vX.Y.Z`. O workflow **Release** roda `scripts/build-release.ps1` no Windows e publica a release. A tag tem que bater com a versão.
+- **Publicar versão:** subir `version` em `[workspace.package]` do `Cargo.toml` e fazer o merge na `main`. Depois, em **Actions → Release → Run workflow**, o workflow cria a tag `v<versão>` e publica a release. Pela API, é o `workflow_dispatch` do `release.yml`. O proxy da sessão de nuvem recusa push de tag (403); da máquina do dono, `git push` da tag também funciona.
 - **Contrato com `crates/update`, não renomear:** `Swoop_<versão>_x64-setup.exe` e `SHA256SUMS.txt`. A atualização só aceita URLs de `github.com/Rakjsu/Swoop/releases/download/`.
 - **Parâmetros do setup NSIS:**
   - o atualizador roda `/P /UPDATE /R` (passivo, sem recriar atalhos, reabre o app como usuário comum);

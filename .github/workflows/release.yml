@@ -1,12 +1,16 @@
 name: Release
 
-# Publica uma versão: `git tag v0.1.0 && git push origin v0.1.0`.
-# A tag precisa bater com `version` do Cargo.toml. A release fica pública na
-# hora, e os apps instalados passam a oferecer a atualização.
+# Publica a versão que está no `version` do Cargo.toml. Dois jeitos:
+# - GitHub → Actions → Release → "Run workflow" (na main): cria a tag
+#   `v<versão>` no commit atual e publica;
+# - `git tag v0.1.0 && git push origin v0.1.0`: a tag tem que bater com a versão.
+# A release fica pública na hora, e os apps instalados passam a oferecer a
+# atualização. Versão já publicada não é sobrescrita (o gh recusa).
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,13 +20,16 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
-      - name: tag = versão do Cargo.toml
+      - name: versão e tag
+        id: ver
         shell: pwsh
         run: |
           $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches.Groups[1].Value
-          if ("v$version" -ne "${{ github.ref_name }}") {
+          $tag = "v$version"
+          if ("${{ github.event_name }}" -eq 'push' -and $tag -ne "${{ github.ref_name }}") {
             throw "tag ${{ github.ref_name }} diferente da versão $version do Cargo.toml"
           }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -38,7 +45,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $tag = "${{ steps.ver.outputs.tag }}"
           $files = Get-ChildItem dist -File | ForEach-Object { $_.FullName }
-          gh release create "${{ github.ref_name }}" $files `
-            --title "Swoop ${{ github.ref_name }}" `
+          gh release create $tag $files `
+            --target "${{ github.sha }}" `
+            --title "Swoop $tag" `
             --generate-notes
