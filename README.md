@@ -16,6 +16,16 @@ O Swoop respeita as regras dos servidores:
 - a contagem regressiva aparece na tela;
 - contas premium são as do próprio usuário, guardadas no cofre do sistema.
 
+## Instalar (Windows)
+
+1. Baixe o **`Swoop-Installer-<versão>.exe`** em [Releases](https://github.com/Rakjsu/Swoop/releases/latest).
+2. O instalador ainda não tem assinatura de código, então o Windows pode mostrar "O Windows protegeu o computador". Clique em **Mais informações → Executar assim mesmo**.
+3. Aceite o pedido de administrador e clique em **Instalar**. O Swoop vai para `C:\Program Files\Swoop`, com atalhos no Menu Iniciar e na área de trabalho.
+
+**Atualizações:** ao abrir, e a cada 6 h, o app procura versão nova nas Releases. Se houver, aparece a faixa "Versão X disponível — **Atualizar**". O clique baixa o instalador, confere o sha256 publicado, pede o administrador e reabre o Swoop atualizado.
+
+**Alternativa:** `Swoop_<versão>_x64-setup.exe` é o instalador NSIS padrão. Ele também instala o WebView2 se estiver faltando.
+
 ## Estado
 
 | Fase | Entrega | Portão |
@@ -29,7 +39,8 @@ O Swoop respeita as regras dos servidores:
 | 6 | Mega e Gofile | MAC do Mega ok; retomar 1 GiB |
 | 7 | Área de transferência + extensão de navegador | link aparece em ≤ 1 s |
 | 8 | Controle remoto na rede local (QR) | painel no celular; segurança testada |
-| 9 | Instalador personalizado, atualização automática | instala em `C:\Program Files\Swoop`; 0.1.0 → 0.1.1 |
+| 9a ✅ | Instalador personalizado (estilo NeoStream) + atualização pelo GitHub (adiantado) | CI gera o instalador; release v0.1.0 publicada |
+| 9 | Autostart, agendador, desligar ao terminar, AppImage/deb | instala em `C:\Program Files\Swoop`; 0.1.0 → 0.1.1 |
 
 Plano completo: [`docs/specs/2026-09-25-swoop-design.md`](docs/specs/2026-09-25-swoop-design.md).
 
@@ -81,6 +92,9 @@ O binário sai em `target/release/swoop`. O instalador NSIS chega na fase 2.
 | `crates/hosts` | plugins de servidores (fase 1: link direto) |
 | `crates/service` | liga banco + motor + plugins; trava de instância única |
 | `crates/testsrv` | servidor HTTP de teste com Range e falhas simuladas (só testes) |
+| `crates/update` | atualização pelas Releases do GitHub (consulta, download, sha256) |
+| `apps/swoop-installer` | instalador personalizado: janela própria que roda o setup NSIS em silêncio |
+| `scripts/build-release.ps1` | gera `dist/` (setup NSIS, instalador personalizado, SHA256SUMS) |
 | `apps/swoop` | app desktop Tauri (janela, comandos, permissões, ícones) |
 | `apps/swoop-cli` | o mesmo motor sem janela |
 | `ui/` | interface React + TypeScript (a mesma para desktop e painel do celular) |

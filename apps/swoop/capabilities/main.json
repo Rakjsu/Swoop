@@ -3,5 +3,5 @@
   "identifier": "main",
   "description": "Permissões da janela principal. Janelas de captcha (fase 4) não entram aqui: página de servidor nunca fala com o Rust.",
   "windows": ["main"],
-  "permissions": ["core:default", "allow-app-info"]
+  "permissions": ["core:default", "allow-app-info", "allow-update-status", "allow-install-update"]
 }

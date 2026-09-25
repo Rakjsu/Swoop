@@ -1,12 +1,13 @@
 //! Swoop desktop: janela Tauri que hospeda a UI React.
 //!
-//! Na fase 0 só expõe `app_info`; o motor, a bandeja e os demais comandos
-//! entram na fase 2 sobre o crate `swoop-service`.
+//! Expõe `app_info` e a atualização pelo GitHub (`update`); o motor, a bandeja
+//! e os demais comandos entram na fase 2 sobre o crate `swoop-service`.
 
 // Sem console extra no Windows em release.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod update;
 
 use tauri::Manager;
 use tracing_subscriber::EnvFilter;
@@ -28,6 +29,7 @@ fn focus_main_window(app: &tauri::AppHandle) {
 
 fn main() {
     init_tracing();
+    swoop_net::install_crypto_provider();
     tracing::info!("{} iniciando", swoop_core::version_line());
 
     tauri::Builder::default()
@@ -35,7 +37,16 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             focus_main_window(app);
         }))
-        .invoke_handler(tauri::generate_handler![commands::app_info])
+        .manage(update::UpdateState::default())
+        .setup(|app| {
+            update::spawn_checker(app.handle().clone());
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::app_info,
+            update::update_status,
+            update::install_update
+        ])
         .run(tauri::generate_context!())
         .expect("falha ao iniciar o Swoop");
 }

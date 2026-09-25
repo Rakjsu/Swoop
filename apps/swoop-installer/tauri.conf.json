@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Instalador do Swoop",
+  "mainBinaryName": "swoop-installer",
+  "identifier": "io.github.rakjsu.swoop.installer",
+  "build": {
+    "frontendDist": "ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Instalação do Swoop",
+        "width": 760,
+        "height": 500,
+        "resizable": false,
+        "maximizable": false,
+        "decorations": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["../swoop/icons/icon.png", "../swoop/icons/icon.ico"]
+  }
+}

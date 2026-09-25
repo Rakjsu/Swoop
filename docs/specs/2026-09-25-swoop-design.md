@@ -360,3 +360,8 @@ Cada fase sai numa branch própria com um PR para `main` no `rakjsu/swoop`, e o 
 | (e) 1 de 8 conexões a 64 KiB/s | 1,21–1,22× o tempo normal |
 | (f) 20 na fila, 3 simultâneos, 2 conexões | picos: 3 downloads, 6 conexões; com 4 por servidor, pico de 4 |
 | (g) proptest | invariante da tabela de segmentos mantido |
+- **25/09, instalador adiantado (pedido do dono):**
+  - Fase "9a" feita antes da 2: instalador personalizado igual ao do NeoStream (casca Tauri com `requireAdministrator` e setup NSIS perMachine embutido) e atualização pelo GitHub.
+  - Decisão do dono: a atualização vem das Releases do GitHub, sem chave própria de assinatura (como o NeoStream). Garantias: HTTPS com certificado verificado, URL restrita a `github.com/Rakjsu/Swoop/releases/download/`, sha256 do `SHA256SUMS.txt` e nada de voltar para versão anterior.
+  - Risco aceito: se a conta do GitHub for comprometida, uma release falsa seria instalada.
+  - Caminho para fechar esse risco: trocar pelo `tauri-plugin-updater` com a chave privada nos Secrets. O plugin já foi conferido: usa rustls com ring, sem aws-lc.

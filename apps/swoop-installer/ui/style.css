@@ -1,0 +1,332 @@
+/* Instalador do Swoop: mesma linguagem visual do app
+   (azul-noite #0b1120, acento céu #38bdf8 → índigo #6366f1). */
+
+:root {
+  --bg: #0b1120;
+  --bg-alt: #111a2e;
+  --surface: #16213a;
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --grad: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  user-select: none;
+  cursor: default;
+}
+
+/* Barra de título */
+.title-bar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 12px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+  border-bottom: 1px solid rgb(56 189 248 / 18%);
+  z-index: 10;
+}
+
+.title-bar-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.window-controls {
+  display: flex;
+  height: 100%;
+}
+
+.window-btn {
+  width: 46px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  display: grid;
+  place-items: center;
+}
+
+.window-btn:hover {
+  background: rgb(255 255 255 / 8%);
+  color: var(--text);
+}
+
+.window-btn.close:hover {
+  background: #e81123;
+  color: #fff;
+}
+
+/* Conteúdo */
+.content {
+  position: relative;
+  height: 100%;
+  padding-top: 36px;
+  display: grid;
+  place-items: center;
+}
+
+.glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.glow-1 {
+  width: 320px;
+  height: 320px;
+  background: #38bdf8;
+  top: -120px;
+  left: -80px;
+}
+
+.glow-2 {
+  width: 280px;
+  height: 280px;
+  background: #6366f1;
+  bottom: -140px;
+  right: -60px;
+}
+
+.step {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  z-index: 1;
+  animation: enter 0.35s ease-out;
+}
+
+.step.active {
+  display: flex;
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.logo {
+  filter: drop-shadow(0 12px 32px rgb(56 189 248 / 25%));
+  margin-bottom: 4px;
+}
+
+.app-name {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: var(--grad);
+  background-clip: text;
+  color: transparent;
+}
+
+.app-version,
+.hint,
+.branding {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.tagline,
+.subtitle {
+  color: var(--text-dim);
+  max-width: 460px;
+  margin-bottom: 10px;
+}
+
+.step-title {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+/* Botões */
+.btn-primary {
+  min-width: 200px;
+  padding: 12px 28px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--grad);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgb(99 102 241 / 35%);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px rgb(99 102 241 / 45%);
+}
+
+.btn-secondary {
+  padding: 6px 12px;
+  border: 1px solid rgb(148 163 184 / 30%);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.link-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.dir-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgb(22 33 58 / 80%);
+  font-size: 12px;
+}
+
+.dir-row.hidden {
+  display: none;
+}
+
+.dir-label {
+  color: var(--text-dim);
+}
+
+.dir-path {
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Instalando */
+.installing-icon .logo-arrow,
+.logo .logo-arrow {
+  animation: dive 1.4s ease-in-out infinite;
+}
+
+@keyframes dive {
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+.install-status {
+  color: var(--text-dim);
+  min-height: 1.4em;
+  transition: opacity 0.25s;
+}
+
+.install-status.fade {
+  opacity: 0;
+}
+
+.progress-track {
+  position: relative;
+  width: 360px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 8%);
+  overflow: hidden;
+}
+
+.progress-shimmer {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: 3px;
+  background: var(--grad);
+  animation: shimmer 1.3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+/* Concluído */
+.check-path {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: draw 0.6s 0.2s ease-out forwards;
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.launch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
+.launch-row input {
+  display: none;
+}
+
+.checkmark {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid rgb(148 163 184 / 50%);
+  display: grid;
+  place-items: center;
+}
+
+.launch-row input:checked + .checkmark {
+  background: var(--grad);
+  border-color: transparent;
+}
+
+.launch-row input:checked + .checkmark::after {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+
+.branding {
+  position: absolute;
+  bottom: 12px;
+}
