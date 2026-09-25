@@ -27,6 +27,7 @@ export const tauriTransport: Transport = {
   exec: (cmd) => invoke('exec', { cmd }),
   list: () => invoke('list'),
   history: (limit) => invoke('history', { limit }),
+  collector: () => invoke('collector'),
   settings: () => invoke('settings'),
   onPush(listener) {
     listeners.add(listener);

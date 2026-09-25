@@ -358,3 +358,38 @@
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* Cabeçalho de pacote (mesma altura das linhas: a lista virtual depende dela) */
+
+.pkg-row {
+  height: 56px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  background: rgb(255 255 255 / 3%);
+}
+
+.pkg-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.pkg-chevron {
+  width: 12px;
+  color: var(--text-dim);
+}
+
+.pkg-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

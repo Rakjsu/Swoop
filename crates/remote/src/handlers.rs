@@ -60,6 +60,11 @@ pub async fn history(
     Ok(Json(s.backend.history(limit).await?).into_response())
 }
 
+/// `GET /api/v1/collector`: links do coletor.
+pub async fn collector(State(s): State<Arc<Shared>>) -> Result<Response, Failure> {
+    Ok(Json(s.backend.collector().await?).into_response())
+}
+
 /// `GET /api/v1/settings`: preferências em uso.
 pub async fn settings(State(s): State<Arc<Shared>>) -> Result<Response, Failure> {
     Ok(Json(s.backend.settings().await?).into_response())

@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { loadAppInfo, type AppInfo } from './appInfo';
+import { CollectorView } from './collector/CollectorView';
 import { DownloadsView } from './downloads/DownloadsView';
 import { HistoryView } from './history/HistoryView';
 import { OptionsView } from './options/OptionsView';
 import { transport, type Transport } from './transport';
 import { UpdateBanner } from './update/UpdateBanner';
 
-type Tab = 'downloads' | 'history' | 'options';
+type Tab = 'downloads' | 'collector' | 'history' | 'options';
 
 const TABS: Array<[Tab, string]> = [
   ['downloads', 'Downloads'],
+  ['collector', 'Coletor'],
   ['history', 'Histórico'],
   ['options', 'Opções'],
 ];
@@ -49,15 +51,17 @@ export function App() {
           </nav>
         )}
       </header>
-      {transport ? <Screen tab={tab} transport={transport} /> : <BrowserNotice />}
+      {transport ? <Screen tab={tab} transport={transport} go={setTab} /> : <BrowserNotice />}
     </div>
   );
 }
 
-function Screen({ tab, transport }: { tab: Tab; transport: Transport }) {
+function Screen({ tab, transport, go }: { tab: Tab; transport: Transport; go: (tab: Tab) => void }) {
   switch (tab) {
     case 'downloads':
-      return <DownloadsView transport={transport} />;
+      return <DownloadsView transport={transport} onCollected={() => go('collector')} />;
+    case 'collector':
+      return <CollectorView transport={transport} onStarted={() => go('downloads')} />;
     case 'history':
       return <HistoryView transport={transport} />;
     case 'options':

@@ -10,6 +10,7 @@ fn main() {
         "exec",
         "list",
         "history",
+        "collector",
         "settings",
         "subscribe",
         "reveal_download",

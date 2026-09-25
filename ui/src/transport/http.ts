@@ -71,6 +71,7 @@ export function createHttpTransport(): Transport | null {
     exec: (cmd) => call('/exec', { method: 'POST', body: JSON.stringify(cmd) }),
     list: () => call('/list'),
     history: (limit) => call(`/history?limit=${limit}`),
+    collector: () => call('/collector'),
     settings: () => call('/settings'),
     onPush(listener) {
       listeners.add(listener);

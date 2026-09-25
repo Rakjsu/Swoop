@@ -47,6 +47,24 @@ pub enum Command {
     SaveSettings {
         settings: Settings,
     },
+    /// Coletor: acha os links do texto (pastas viram arquivos) e confere.
+    Collect {
+        text: String,
+    },
+    /// Coletor → fila, num pacote; `dest` vazio = pasta automática.
+    CollectorStart {
+        ids: Vec<i64>,
+        #[ts(optional)]
+        dest: Option<String>,
+    },
+    /// Tira links do coletor.
+    CollectorRemove {
+        ids: Vec<i64>,
+    },
+    /// Tira do coletor os links offline.
+    CollectorRemoveOffline,
+    /// Esvazia o coletor.
+    CollectorClear,
 }
 
 /// Resposta a um `Command`.
@@ -58,6 +76,10 @@ pub enum Reply {
     /// Ids dos downloads criados por `AddLinks`.
     Added {
         ids: Vec<i64>,
+    },
+    /// Links novos que entraram no coletor (repetidos não contam).
+    Collected {
+        added: u32,
     },
 }
 
@@ -78,6 +100,16 @@ mod tests {
             cmd,
             Command::AddLinks {
                 links: vec!["http://a/b".into()],
+                dest: None
+            }
+        );
+
+        let cmd: Command =
+            serde_json::from_value(json!({ "type": "collector_start", "ids": [3] })).unwrap();
+        assert_eq!(
+            cmd,
+            Command::CollectorStart {
+                ids: vec![3],
                 dest: None
             }
         );

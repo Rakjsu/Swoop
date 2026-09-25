@@ -1,23 +1,37 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { AddLinksDialog } from '../collector/AddLinksDialog';
 import type { Command } from '../gen/Command';
 import type { DownloadView } from '../gen/DownloadView';
 import { errorMessage, type Transport } from '../transport';
-import { AddLinksDialog } from './AddLinksDialog';
 import { ConfirmRemove } from './ConfirmRemove';
 import { DownloadRow, ROW_HEIGHT, type RowAction } from './DownloadRow';
+import { PackageRow } from './PackageRow';
+import { buildItems } from './packages';
 import { StatusBar } from './StatusBar';
 import { Toolbar } from './Toolbar';
+import { useCollapsed } from './useCollapsed';
 import { useDownloads } from './useDownloads';
 import { useVirtualRows } from './useVirtualRows';
 import './downloads.css';
 
-/** Tela principal: barra de ações, lista (virtual) de downloads e rodapé. */
-export function DownloadsView({ transport }: { transport: Transport }) {
+interface Props {
+  transport: Transport;
+  /** Vai para o Coletor depois de adicionar links. */
+  onCollected: () => void;
+}
+
+/**
+ * Tela principal: barra de ações, lista (virtual) de downloads agrupados em
+ * pacotes recolhíveis e rodapé.
+ */
+export function DownloadsView({ transport, onCollected }: Props) {
   const { rows, live, snapshot, loaded, error } = useDownloads(transport);
+  const [collapsed, toggleCollapsed] = useCollapsed();
+  const items = useMemo(() => buildItems(rows, live, collapsed), [rows, live, collapsed]);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<DownloadView | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const { ref: listRef, start, end, totalHeight, offset } = useVirtualRows(rows.length, ROW_HEIGHT);
+  const { ref: listRef, start, end, totalHeight, offset } = useVirtualRows(items.length, ROW_HEIGHT);
 
   const run = useCallback(
     (cmd: Command) => {
@@ -81,21 +95,25 @@ export function DownloadsView({ transport }: { transport: Transport }) {
         ) : (
           <div className="dl-spacer" style={{ height: totalHeight }}>
             <div className="dl-window" style={{ transform: `translateY(${offset}px)` }}>
-              {rows.slice(start, end).map((row) => (
-                <DownloadRow
-                  key={row.id}
-                  row={row}
-                  live={live.get(row.id)}
-                  canReveal={Boolean(transport.revealDownload)}
-                  onAction={onAction}
-                />
-              ))}
+              {items.slice(start, end).map((item) =>
+                item.kind === 'package' ? (
+                  <PackageRow key={item.key} pkg={item.pkg} onToggle={toggleCollapsed} />
+                ) : (
+                  <DownloadRow
+                    key={item.key}
+                    row={item.row}
+                    live={live.get(item.row.id)}
+                    canReveal={Boolean(transport.revealDownload)}
+                    onAction={onAction}
+                  />
+                ),
+              )}
             </div>
           </div>
         )}
       </div>
       <StatusBar rows={rows} snapshot={snapshot} />
-      {adding && <AddLinksDialog transport={transport} onClose={() => setAdding(false)} />}
+      {adding && <AddLinksDialog transport={transport} onClose={() => setAdding(false)} onAdded={onCollected} />}
       {removing && (
         <ConfirmRemove
           row={removing}

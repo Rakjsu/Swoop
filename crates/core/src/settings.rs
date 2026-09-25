@@ -32,6 +32,8 @@ pub struct Settings {
     pub max_retries: u32,
     /// Avisos do sistema quando a fila termina ou um download falha.
     pub notify: bool,
+    /// Coletor: links que ficam online entram na fila sem clique.
+    pub auto_start: bool,
 }
 
 impl Default for Settings {
@@ -46,6 +48,7 @@ impl Default for Settings {
             speed_limit_bps: None,
             max_retries: 5,
             notify: true,
+            auto_start: false,
         }
     }
 }

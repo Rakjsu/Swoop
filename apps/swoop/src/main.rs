@@ -70,6 +70,7 @@ fn main() {
             commands::exec,
             commands::list,
             commands::history,
+            commands::collector,
             commands::settings,
             commands::subscribe,
             commands::reveal_download,

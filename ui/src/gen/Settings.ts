@@ -40,4 +40,8 @@ max_retries: number,
 /**
  * Avisos do sistema quando a fila termina ou um download falha.
  */
-notify: boolean, };
+notify: boolean, 
+/**
+ * Coletor: links que ficam online entram na fila sem clique.
+ */
+auto_start: boolean, };

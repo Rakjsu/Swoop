@@ -32,19 +32,29 @@ pub fn insert(
     Ok(PackageId(c.last_insert_rowid()))
 }
 
+fn from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<PackageRow> {
+    Ok(PackageRow {
+        id: PackageId(r.get(0)?),
+        name: r.get(1)?,
+        dest_dir: PathBuf::from(r.get::<_, String>(2)?),
+        auto_dest: r.get(3)?,
+    })
+}
+
 /// Busca um pacote pelo id.
 pub fn get(c: &Connection, id: PackageId) -> Result<Option<PackageRow>, StoreError> {
     Ok(c.query_row(
         "SELECT id, name, dest_dir, auto_dest FROM packages WHERE id = ?1",
         [id.0],
-        |r| {
-            Ok(PackageRow {
-                id: PackageId(r.get(0)?),
-                name: r.get(1)?,
-                dest_dir: PathBuf::from(r.get::<_, String>(2)?),
-                auto_dest: r.get(3)?,
-            })
-        },
+        from_row,
     )
     .optional()?)
+}
+
+/// Todos os pacotes, na ordem da lista.
+pub fn list(c: &Connection) -> Result<Vec<PackageRow>, StoreError> {
+    let mut stmt =
+        c.prepare("SELECT id, name, dest_dir, auto_dest FROM packages ORDER BY position")?;
+    let rows = stmt.query_map([], from_row)?;
+    Ok(rows.collect::<Result<_, _>>()?)
 }

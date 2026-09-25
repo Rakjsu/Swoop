@@ -110,8 +110,9 @@ fn linha_do_banco_vira_linha_da_interface() {
         started_at: None,
         finished_at: None,
     };
-    let v = view(row);
+    let v = view(row, "pacote".into());
     assert_eq!(v.id, 4);
+    assert_eq!((v.package_id, v.package_name.as_str()), (1, "pacote"));
     assert_eq!(v.file_name.as_deref(), Some("a.bin"));
     assert_eq!(v.final_path.as_deref(), Some("/tmp/a.bin"));
     assert_eq!(v.state, DownloadState::Completed);

@@ -4,4 +4,4 @@ import type { Settings } from "./Settings";
 /**
  * Pedido da interface. No JSON: `{ "type": "pause", "id": 3 }`.
  */
-export type Command = { "type": "add_links", links: Array<string>, dest?: string, } | { "type": "pause", id: number, } | { "type": "resume", id: number, } | { "type": "retry", id: number, } | { "type": "remove", id: number, delete_file: boolean, } | { "type": "pause_all" } | { "type": "resume_all" } | { "type": "set_speed_limit", bps?: number, } | { "type": "save_settings", settings: Settings, };
+export type Command = { "type": "add_links", links: Array<string>, dest?: string, } | { "type": "pause", id: number, } | { "type": "resume", id: number, } | { "type": "retry", id: number, } | { "type": "remove", id: number, delete_file: boolean, } | { "type": "pause_all" } | { "type": "resume_all" } | { "type": "set_speed_limit", bps?: number, } | { "type": "save_settings", settings: Settings, } | { "type": "collect", text: string, } | { "type": "collector_start", ids: Array<number>, dest?: string, } | { "type": "collector_remove", ids: Array<number>, } | { "type": "collector_remove_offline" } | { "type": "collector_clear" };

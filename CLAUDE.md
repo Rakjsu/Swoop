@@ -70,6 +70,8 @@ fases com portões está em `docs/specs/2026-09-25-swoop-design.md`: ler antes d
 - **Leitura de página:** sempre por `page::get`/`page::read_body` — detecta quando o "link da página" já entrega o arquivo (o Mediafire faz isso com alguns links) e corta em 4 MiB. `res.text()` direto baixaria o arquivo inteiro para a memória.
 - **Erro de rede do reqwest:** `page::network` usa `without_url()` e só as causas internas; o `Display` do próprio erro traz a URL.
 - **`HostError::BrowserRequired`:** a mensagem é mostrada como está, então diz o servidor e o que fazer ("o Mediafire pediu captcha; abra o link no navegador").
+- **Coletor (`crates/service/src/collector.rs` + `crates/store/src/collector.rs`):** URL única (colar de novo não duplica); `batch` = uma colagem (vira um pacote no "iniciar sozinho"); verificação em levas de até 4, uma por servidor (`host_key` = plugin ou domínio); `checking` volta para `unchecked` ao reabrir. A janela usa `Command::Collect`; `AddLinks` direto fica para CLI/API.
+- **Lista de Downloads com pacotes:** cabeçalho e linhas têm a mesma altura (`ROW_HEIGHT`), achatados por `buildItems` — a lista virtual continua simples. Recolhidos ficam no `localStorage` (try/catch).
 - **Pasta do Drive:** a página `embeddedfolderview` é lida por todos os `<a href>` (como o gdown), sem depender de classe; Docs/Planilhas nativos são ignorados.
 
 ## Nunca

@@ -39,8 +39,13 @@ test('adicionar, pausar tudo, retomar e concluir 3 downloads', async ({ page }) 
   const links = [1, 2, 3].map(
     (n) => `${stack.testsrv}/file/parte${n}.bin?size=${SIZE}&seed=${n}&rate=${256 * 1024}`,
   );
-  await page.getByPlaceholder(/Cole um link por linha/).fill(links.join('\n'));
+  await page.getByPlaceholder(/Cole os links/).fill(links.join('\n'));
   await page.getByRole('button', { name: 'Adicionar 3 links' }).click();
+
+  // os links passam pelo Coletor (fase 3b): conferidos, depois "Iniciar"
+  await expect(page.getByRole('tab', { name: 'Coletor' })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('button', { name: 'Iniciar todos online (3)' }).click();
+  await expect(page.getByRole('tab', { name: 'Downloads' })).toHaveAttribute('aria-selected', 'true');
 
   const rows = page.locator('.dl-row');
   await expect(rows).toHaveCount(3);
