@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Permissões da janela principal. Janelas de captcha (fase 4) não entram aqui: página de servidor nunca fala com o Rust.",
+  "windows": ["main"],
+  "permissions": ["core:default", "allow-app-info"]
+}

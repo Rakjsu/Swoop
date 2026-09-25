@@ -1,0 +1,47 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/core",
+    "crates/api",
+    "apps/swoop-cli",
+    "apps/swoop",
+]
+# O app desktop exige `ui/dist` já construído (generate_context!); fora do padrão
+# para `cargo build/test` funcionar sem Node. Use `-p swoop` quando precisar dele.
+default-members = [
+    "crates/core",
+    "crates/api",
+    "apps/swoop-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.93"
+repository = "https://github.com/rakjsu/swoop"
+
+[workspace.dependencies]
+# internos
+swoop-core = { path = "crates/core" }
+swoop-api = { path = "crates/api" }
+
+# desktop
+tauri = { version = "2.11", features = [] }
+tauri-build = { version = "2.6", features = [] }
+tauri-plugin-single-instance = "2.4"
+
+# runtime / util
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+eyre = "0.6"
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

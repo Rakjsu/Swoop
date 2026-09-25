@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Swoop",
+  "mainBinaryName": "swoop",
+  "identifier": "io.github.rakjsu.swoop",
+  "build": {
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../../ui/dist",
+    "beforeDevCommand": { "script": "npm run dev", "cwd": "../../ui" },
+    "beforeBuildCommand": { "script": "npm run build", "cwd": "../../ui" }
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Swoop",
+        "width": 1100,
+        "height": 700,
+        "minWidth": 800,
+        "minHeight": 520,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Rakjsu",
+    "copyright": "© Rakjsu",
+    "category": "Utility",
+    "shortDescription": "Gerenciador de downloads",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "nsis": {
+        "installMode": "perMachine",
+        "languages": ["PortugueseBR"],
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico"
+      }
+    }
+  }
+}

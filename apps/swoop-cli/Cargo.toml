@@ -1,0 +1,18 @@
+[package]
+name = "swoop-cli"
+description = "Swoop sem janela: baixar, retomar, verificar links e servir o painel"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "swoop-cli"
+path = "src/main.rs"
+
+[dependencies]
+swoop-core.workspace = true
+clap.workspace = true
+eyre.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

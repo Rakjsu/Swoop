@@ -1,0 +1,14 @@
+[package]
+name = "swoop-api"
+description = "Contrato entre o motor e as interfaces (desktop, painel remoto, extensão)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+swoop-core.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

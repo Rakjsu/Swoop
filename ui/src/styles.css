@@ -1,0 +1,66 @@
+/* Identidade visual do Swoop: fundo azul-noite, acento céu → índigo. */
+
+:root {
+  --bg: #0b1120;
+  --bg-alt: #111a2e;
+  --surface: #16213a;
+  --accent: #38bdf8;
+  --accent-2: #6366f1;
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --grad: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: radial-gradient(circle at 30% 20%, var(--bg-alt) 0%, var(--bg) 60%);
+}
+
+.splash {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.splash-logo {
+  filter: drop-shadow(0 12px 32px rgb(56 189 248 / 25%));
+}
+
+.splash-title {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: var(--grad);
+  background-clip: text;
+  color: transparent;
+}
+
+.splash-tagline {
+  color: var(--text-dim);
+  font-size: 16px;
+}
+
+.splash-status {
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--text-dim);
+}

@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Motor, crates e CLI: não dependem da UI nem do WebView (default-members).
+  rust:
+    name: rust (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: fmt
+        if: runner.os == 'Linux'
+        run: cargo fmt --all -- --check
+      - name: clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: test
+        run: cargo test --all-targets
+      - name: sem aws-lc-sys (build no Windows não pode exigir NASM)
+        shell: bash
+        run: |
+          if cargo tree --workspace --target all -i aws-lc-sys >/dev/null 2>&1; then
+            echo "::error::aws-lc-sys entrou na árvore de dependências (use rustls com ring)"
+            cargo tree --workspace --target all -i aws-lc-sys
+            exit 1
+          fi
+
+  # UI (lint + tipos + build) e o app Tauri, que exige ui/dist para compilar.
+  desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: dependências do WebKitGTK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: npm ci
+        working-directory: ui
+        run: npm ci
+      - name: lint
+        working-directory: ui
+        run: npm run lint
+      - name: build (tsc + vite)
+        working-directory: ui
+        run: npm run build
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: clippy do app desktop
+        run: cargo clippy -p swoop --all-targets -- -D warnings

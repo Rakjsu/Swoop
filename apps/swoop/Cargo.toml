@@ -1,0 +1,24 @@
+[package]
+name = "swoop"
+description = "Swoop: gerenciador de downloads desktop (Tauri 2)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "swoop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build.workspace = true
+
+[dependencies]
+swoop-core.workspace = true
+swoop-api.workspace = true
+tauri.workspace = true
+tauri-plugin-single-instance.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
