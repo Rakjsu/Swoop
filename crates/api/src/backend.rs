@@ -1,7 +1,7 @@
 //! A porta de entrada das interfaces. A janela Tauri e o painel web falam só
 //! com esta trait; quem a implementa (o `swoop-service`) liga banco e motor.
 
-use crate::{Command, DownloadView, HistoryView, Push, Reply, Snapshot};
+use crate::{CollectorView, Command, DownloadView, HistoryView, Push, Reply, Snapshot};
 use async_trait::async_trait;
 use serde::Serialize;
 use swoop_core::Settings;
@@ -65,6 +65,9 @@ pub trait Backend: Send + Sync {
 
     /// As `limit` entradas mais recentes do histórico.
     async fn history(&self, limit: u32) -> Result<Vec<HistoryView>, ApiError>;
+
+    /// Links do coletor, na ordem em que entraram.
+    async fn collector(&self) -> Result<Vec<CollectorView>, ApiError>;
 
     /// Preferências em uso (pastas já preenchidas com as do sistema).
     async fn settings(&self) -> Result<Settings, ApiError>;

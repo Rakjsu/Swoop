@@ -1,0 +1,99 @@
+/* Coletor: barra de ações, pasta de destino e a lista de links. */
+
+.collector {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.col-auto {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.col-dest {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.col-dest span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.col-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+}
+
+.col-row {
+  display: grid;
+  grid-template-columns: 20px 110px minmax(180px, 1fr) 140px 84px;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 4px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.col-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.col-title,
+.col-error,
+.col-host {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.col-error {
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.col-host,
+.col-size {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.col-state {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.col-online .col-state {
+  color: var(--ok);
+}
+
+.col-offline .col-state {
+  color: var(--danger);
+}
+
+.col-checking .col-state {
+  color: var(--accent);
+}
+
+.modal-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}

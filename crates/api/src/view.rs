@@ -2,7 +2,7 @@
 //! dos downloads ativos (≈5 por segundo) e os avisos empurrados.
 
 use serde::Serialize;
-use swoop_core::DownloadState;
+use swoop_core::{DownloadState, LinkState};
 use ts_rs::TS;
 
 /// Uma linha da lista de downloads, como está no banco.
@@ -21,6 +21,24 @@ pub struct DownloadView {
     /// Até quando espera (ms Unix), quando `state` é `waiting`.
     pub wait_until_ms: Option<i64>,
     pub final_path: Option<String>,
+    /// Pacote do download (a lista agrupa por ele).
+    pub package_id: i64,
+    pub package_name: String,
+}
+
+/// Um link no coletor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+pub struct CollectorView {
+    pub id: i64,
+    pub url: String,
+    /// Servidor (plugin ou domínio).
+    pub host: String,
+    pub state: LinkState,
+    pub file_name: Option<String>,
+    pub size: Option<u64>,
+    /// Motivo de offline/falha.
+    pub error: Option<String>,
 }
 
 /// Progresso de um download ativo.
@@ -137,6 +155,8 @@ mod tests {
             error: None,
             wait_until_ms: None,
             final_path: None,
+            package_id: 1,
+            package_name: "p".into(),
         };
         assert_eq!(serde_json::to_value(view).unwrap()["state"], "downloading");
     }

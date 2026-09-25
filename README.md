@@ -35,7 +35,7 @@ O Swoop respeita as regras dos servidores:
 | 2a ✅ | Tela de downloads: adicionar links, pausar/retomar/remover, limite, bandeja (v0.2.0) | testado no app real com o servidor de teste; retoma após reabrir |
 | 2b ✅ | Histórico, opções salvas, pasta automática por tipo, notificações, painel no navegador (`serve`) (v0.3.0) | Playwright: pausar tudo zera em ≤ 1 s e 3 × 24 MB certos; 50 retratos em 10 s |
 | 3a ✅ | Pixeldrain, Mediafire e Google Drive (pastas viram arquivos), regras editáveis, `swoop-cli check`/`resolve` (v0.4.0) | fixtures de cada caso; link expirado → 1 re-resolução e segue do ponto; testes de rede prontos ⏳ |
-| 3b | Coletor de links (verificar antes de baixar) e pacotes recolhíveis | Playwright do coletor |
+| 3b ✅ | Coletor de links como o do Mipony (confere antes de baixar, "iniciar sozinho") e pacotes recolhíveis (v0.5.0) | Playwright: 3 online + 1 offline em ≤ 5 s, pacote com os 3 certos no disco, recolher esconde |
 | 4 | Janela de captcha, fastfile.cc (XFS), contas premium | 3 downloads grátis seguidos; segredo fora do disco |
 | 5 | Extração com 7-Zip | RAR5 multiparte com senha; zip-slip bloqueado |
 | 6 | Mega e Gofile | MAC do Mega ok; retomar 1 GiB |
@@ -76,6 +76,8 @@ cargo run --release -p swoop-cli -- resolve "https://www.mediafire.com/file/…/
 ```
 
 **Servidores (fase 3a):** Pixeldrain, Mediafire e Google Drive, além de links diretos. Links de pasta (Drive, Mediafire) e de lista (Pixeldrain) viram um download por arquivo. Captcha, arquivo marcado como perigoso ou com senha, e "muitos downloads" do Drive não são contornados: o download mostra o motivo (ou espera, no caso da cota).
+
+**Coletor:** "Adicionar links" manda o texto colado para a aba **Coletor**, que acha os links (até no meio de frases), abre as pastas e confere cada um no servidor (online, nome, tamanho). "Iniciar" leva os escolhidos para a fila num pacote com o nome dos arquivos; com **Iniciar sozinho**, cada colagem vai para a fila assim que termina de ser conferida. Na aba Downloads, cada pacote tem um cabeçalho que recolhe e expande.
 
 **Regras dos servidores:** seletores, endereços e textos que o Swoop procura nas páginas ficam em `rules/hosts.toml` (embutido). Para corrigir uma mudança de site sem esperar versão nova, crie `<pasta de dados>/rules/hosts.toml` só com o que muda, por exemplo:
 ```toml

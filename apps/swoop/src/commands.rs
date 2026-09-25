@@ -6,7 +6,8 @@
 use crate::engine::EngineState;
 use std::path::PathBuf;
 use swoop_api::{
-    ApiError, AppInfo, Backend, Command, DownloadView, HistoryView, Push, Reply, Settings,
+    ApiError, AppInfo, Backend, CollectorView, Command, DownloadView, HistoryView, Push, Reply,
+    Settings,
 };
 use swoop_core::DownloadId;
 use tauri::State;
@@ -37,6 +38,12 @@ pub async fn history(
     limit: u32,
 ) -> Result<Vec<HistoryView>, ApiError> {
     Backend::history(state.service()?.as_ref(), limit).await
+}
+
+/// Links do coletor, na ordem em que entraram.
+#[tauri::command]
+pub async fn collector(state: State<'_, EngineState>) -> Result<Vec<CollectorView>, ApiError> {
+    Backend::collector(state.service()?.as_ref()).await
 }
 
 /// Preferências em uso (tela de Opções).

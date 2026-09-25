@@ -1,4 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core';
+import type { CollectorView } from '../gen/CollectorView';
 import type { Command } from '../gen/Command';
 import type { DownloadView } from '../gen/DownloadView';
 import type { HistoryView } from '../gen/HistoryView';
@@ -16,6 +17,8 @@ export interface Transport {
   exec(cmd: Command): Promise<Reply>;
   list(): Promise<DownloadView[]>;
   history(limit: number): Promise<HistoryView[]>;
+  /** Links do coletor, na ordem em que entraram. */
+  collector(): Promise<CollectorView[]>;
   settings(): Promise<Settings>;
   /** Registra um ouvinte de retratos e avisos; devolve a função que desliga. */
   onPush(listener: (push: Push) => void): () => void;

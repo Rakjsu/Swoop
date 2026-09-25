@@ -4,16 +4,19 @@
 
 use crate::{Service, ServiceError};
 use async_trait::async_trait;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use swoop_api::{
-    ApiError, Backend, Command, DownloadView, HistoryOutcome, HistoryView, Reply, Subscription,
+    ApiError, Backend, CollectorView, Command, DownloadView, HistoryOutcome, HistoryView, Reply,
+    Subscription,
 };
 use swoop_core::{DownloadId, Settings};
+use swoop_store::collector::CollectedRow;
 use swoop_store::history::HistoryRow;
-use swoop_store::{DownloadRow, StoreError};
+use swoop_store::{DownloadRow, StoreError, downloads, packages};
 
-/// Nome dos pacotes criados pela janela (o agrupamento real vem na fase 3).
-const PACKAGE_NAME: &str = "Adicionados pela janela";
+/// Nome dos pacotes criados direto pela API (a janela passa pelo coletor).
+const PACKAGE_NAME: &str = "Links adicionados";
 
 #[async_trait]
 impl Backend for Service {
@@ -37,12 +40,43 @@ impl Backend for Service {
             Command::ResumeAll => engine.resume_all().await.map_err(store)?,
             Command::SetSpeedLimit { bps } => self.set_speed_limit(bps).await?,
             Command::SaveSettings { settings } => self.save_settings(settings).await?,
+            Command::Collect { text } => {
+                let added = self.collector.collect(&text).await?;
+                return Ok(Reply::Collected { added });
+            }
+            Command::CollectorStart { ids, dest } => {
+                let dest = dest.filter(|d| !d.trim().is_empty()).map(PathBuf::from);
+                let ids = self.collector.start(ids, dest.as_deref()).await?;
+                return Ok(Reply::Added {
+                    ids: ids.into_iter().map(|id| id.0).collect(),
+                });
+            }
+            Command::CollectorRemove { ids } => self.collector.remove(Some(ids)).await?,
+            Command::CollectorRemoveOffline => self.collector.remove(None).await?,
+            Command::CollectorClear => self.collector.clear().await?,
         }
         Ok(Reply::Done)
     }
 
     async fn list(&self) -> Result<Vec<DownloadView>, ApiError> {
-        Ok(self.rows().await?.into_iter().map(view).collect())
+        let (rows, pkgs) = self
+            .store
+            .call(|c| Ok((downloads::list(c)?, packages::list(c)?)))
+            .await
+            .map_err(store)?;
+        let names: HashMap<i64, String> = pkgs.into_iter().map(|p| (p.id.0, p.name)).collect();
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                let name = names.get(&r.package_id.0).cloned().unwrap_or_default();
+                view(r, name)
+            })
+            .collect())
+    }
+
+    async fn collector(&self) -> Result<Vec<CollectorView>, ApiError> {
+        let rows = self.collector.rows().await?;
+        Ok(rows.into_iter().map(collector_view).collect())
     }
 
     async fn history(&self, limit: u32) -> Result<Vec<HistoryView>, ApiError> {
@@ -77,9 +111,11 @@ impl Service {
 }
 
 /// Linha do banco → linha da interface.
-fn view(r: DownloadRow) -> DownloadView {
+fn view(r: DownloadRow, package_name: String) -> DownloadView {
     DownloadView {
         id: r.id.0,
+        package_id: r.package_id.0,
+        package_name,
         url: r.url,
         file_name: r.file_name,
         state: r.state,
@@ -88,6 +124,19 @@ fn view(r: DownloadRow) -> DownloadView {
         error: r.error_msg,
         wait_until_ms: r.wait_until,
         final_path: r.final_path.map(|p| p.to_string_lossy().into_owned()),
+    }
+}
+
+/// Link do coletor → linha da interface.
+fn collector_view(r: CollectedRow) -> CollectorView {
+    CollectorView {
+        id: r.id,
+        url: r.url,
+        host: r.host_key,
+        state: r.state,
+        file_name: r.file_name,
+        size: r.size,
+        error: r.error,
     }
 }
 

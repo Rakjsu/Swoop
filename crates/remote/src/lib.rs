@@ -111,6 +111,7 @@ fn router(shared: Arc<Shared>, ui_dir: Option<PathBuf>) -> Router {
         .route("/exec", post(handlers::exec))
         .route("/list", get(handlers::list))
         .route("/history", get(handlers::history))
+        .route("/collector", get(handlers::collector))
         .route("/settings", get(handlers::settings))
         .route_layer(from_fn_with_state(shared.clone(), guard::bearer))
         .route("/ws", get(ws::upgrade));

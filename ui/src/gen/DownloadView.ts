@@ -13,4 +13,8 @@ done_bytes: number, error: string | null,
 /**
  * Até quando espera (ms Unix), quando `state` é `waiting`.
  */
-wait_until_ms: number | null, final_path: string | null, };
+wait_until_ms: number | null, final_path: string | null, 
+/**
+ * Pacote do download (a lista agrupa por ele).
+ */
+package_id: number, package_name: string, };

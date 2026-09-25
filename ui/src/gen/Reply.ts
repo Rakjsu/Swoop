@@ -3,4 +3,4 @@
 /**
  * Resposta a um `Command`.
  */
-export type Reply = { "type": "done" } | { "type": "added", ids: Array<number>, };
+export type Reply = { "type": "done" } | { "type": "added", ids: Array<number>, } | { "type": "collected", added: number, };

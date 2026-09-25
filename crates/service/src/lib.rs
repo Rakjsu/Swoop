@@ -4,11 +4,14 @@
 //! painel remoto.
 
 mod backend;
+mod collector;
 mod links;
+mod naming;
 mod notices;
 mod paths;
 mod prefs;
 
+pub use collector::Collector;
 pub use paths::{data_dir_from_env, default_data_dir, default_download_dir};
 
 use std::fs::File;
@@ -19,7 +22,7 @@ use swoop_core::{DownloadId, DownloadState, Settings};
 use swoop_engine::{Engine, EngineConfig};
 use swoop_hosts::{Registry, Rules};
 use swoop_store::history::HistoryRow;
-use swoop_store::{DownloadRow, Store, StoreError, downloads, history, packages};
+use swoop_store::{DownloadRow, Store, StoreError, downloads, history};
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 
@@ -67,6 +70,9 @@ pub struct Service {
     pushes: broadcast::Sender<Push>,
     /// Tarefa que traduz os eventos do motor em avisos.
     forward: JoinHandle<()>,
+    /// Links colados esperando o "Iniciar" (e a verificação deles).
+    collector: Collector,
+    checker: JoinHandle<()>,
     _lock: File,
 }
 
@@ -87,6 +93,7 @@ impl Service {
         if recovered > 0 {
             tracing::info!("{recovered} download(s) interrompido(s) voltaram para a fila");
         }
+        store.call(|c| swoop_store::collector::recover(c)).await?;
         let settings = prefs::load(&store, opts.settings).await?;
         let rules = Rules::for_data_dir(&data_dir);
         let hosts = Arc::new(Registry::new(rules).map_err(|e| ServiceError::Http(e.to_string()))?);
@@ -106,6 +113,9 @@ impl Service {
             store.clone(),
             pushes.clone(),
         ));
+        let collector =
+            Collector::new(store.clone(), hosts.clone(), engine.clone(), pushes.clone());
+        let checker = collector.spawn();
         Ok(Self {
             store,
             engine,
@@ -113,6 +123,8 @@ impl Service {
             data_dir,
             pushes,
             forward,
+            collector,
+            checker,
             _lock: lock,
         })
     }
@@ -127,19 +139,8 @@ impl Service {
         package_name: &str,
     ) -> Result<Vec<DownloadId>, ServiceError> {
         let urls = links::prepare(&self.hosts, links).await?;
-        let auto = dest.is_none();
-        let dest = dest
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| default_download_dir(&self.engine.settings()));
-        let name = package_name.to_owned();
-        let ids = self
-            .store
-            .call(move |c| {
-                let pkg = packages::insert(c, &name, &dest, auto)?;
-                urls.iter().map(|u| downloads::insert(c, pkg, u)).collect()
-            })
-            .await?;
-        self.engine.wake();
+        let urls = urls.into_iter().map(String::from).collect();
+        let ids = links::enqueue(&self.store, &self.engine, urls, dest, package_name).await?;
         let _ = self.pushes.send(Push::Changed);
         Ok(ids)
     }
@@ -200,6 +201,7 @@ impl Service {
     pub async fn shutdown(&self) {
         self.engine.shutdown().await;
         self.forward.abort();
+        self.checker.abort();
     }
 }
 

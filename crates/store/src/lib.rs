@@ -6,6 +6,7 @@
 //! Os repositórios são funções sobre `&Connection`, testáveis direto.
 
 pub mod actor;
+pub mod collector;
 pub mod downloads;
 pub mod history;
 mod migrations;

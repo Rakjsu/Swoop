@@ -66,6 +66,15 @@ impl Registry {
         self.plugin_for(url).map_or(DIRECT, HostPlugin::id)
     }
 
+    /// Chave do servidor para limites: o plugin ou, no link direto, o
+    /// domínio (a mesma que o `Resolved::direct` usa).
+    pub fn host_key(&self, url: &Url) -> String {
+        match self.plugin_for(url) {
+            Some(p) => p.id().to_owned(),
+            None => url.host_str().unwrap_or(DIRECT).to_ascii_lowercase(),
+        }
+    }
+
     /// Links num texto qualquer.
     pub fn detect(&self, text: &str) -> Vec<Url> {
         let r = &self.ctx.rules;
