@@ -10,7 +10,7 @@
 //! Invariante: as faixas `[start, end)` são disjuntas e cobrem o arquivo, com
 //! `start ≤ written ≤ cursor ≤ end` em cada uma.
 
-use crate::segments::{Span, split_point};
+use crate::segments::{MIN_SEGMENT, Span, split_point};
 use std::time::{Duration, Instant};
 use swoop_store::SegmentRow;
 
@@ -65,6 +65,9 @@ pub struct Advance {
 pub struct Table {
     segs: Vec<Seg>,
     next_idx: u32,
+    /// Maior velocidade (bytes/s) de faixa concluída: referência de "rápido"
+    /// mesmo quando as faixas rápidas já terminaram e só a lenta segue.
+    peak_speed: f64,
 }
 
 impl Table {
@@ -88,7 +91,11 @@ impl Table {
             })
             .collect();
         let next_idx = segs.iter().map(|s| s.idx + 1).max().unwrap_or(0);
-        Self { segs, next_idx }
+        Self {
+            segs,
+            next_idx,
+            peak_speed: 0.0,
+        }
     }
 
     /// Monta a partir de um plano novo.
@@ -162,7 +169,7 @@ impl Table {
             .iter()
             .filter(|s| s.owner.is_some() && s.remaining() > 0)
             .filter_map(|s| s.speed(now))
-            .fold(0.0_f64, f64::max);
+            .fold(self.peak_speed, f64::max);
         let victim = self
             .segs
             .iter_mut()
@@ -195,7 +202,8 @@ impl Table {
     }
 
     /// Registra `n` bytes recebidos na faixa `idx`, cortando no `end` atual.
-    pub fn advance(&mut self, idx: u32, n: usize) -> Advance {
+    /// Ao concluir uma faixa grande o bastante, guarda a velocidade dela.
+    pub fn advance(&mut self, idx: u32, n: usize, now: Instant) -> Advance {
         let Some(seg) = self.segs.iter_mut().find(|s| s.idx == idx) else {
             return Advance {
                 offset: 0,
@@ -206,10 +214,18 @@ impl Table {
         let offset = seg.cursor;
         let accepted = (n as u64).min(seg.remaining()) as usize;
         seg.cursor += accepted as u64;
+        let finished = seg.remaining() == 0;
+        if finished {
+            let bytes = seg.cursor - seg.since_cursor;
+            let secs = now.duration_since(seg.since).as_secs_f64();
+            if bytes >= MIN_SEGMENT / 2 && secs > 0.0 {
+                self.peak_speed = self.peak_speed.max(bytes as f64 / secs);
+            }
+        }
         Advance {
             offset,
             accepted,
-            finished: seg.remaining() == 0,
+            finished,
         }
     }
 
