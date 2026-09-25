@@ -125,7 +125,7 @@ async fn resolve(ctx: &JobCtx, url: &Url, attempt: u32) -> Result<Resolved, Tran
         HostError::Wait { until, reason } => TransferError::Wait {
             until,
             reason,
-            message: "o servidor pediu uma espera".into(),
+            message: reason.describe().into(),
         },
         HostError::Changed(m) => TransferError::Fatal(format!(
             "o servidor mudou e o plugin precisa de atualização: {m}"
@@ -140,6 +140,9 @@ async fn resolve(ctx: &JobCtx, url: &Url, attempt: u32) -> Result<Resolved, Tran
             },
         ),
         HostError::Unsupported => TransferError::Fatal("link não suportado".into()),
+        e @ (HostError::BrowserRequired(_) | HostError::AccessDenied) => {
+            TransferError::Fatal(e.to_string())
+        }
     })
 }
 

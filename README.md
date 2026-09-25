@@ -34,7 +34,8 @@ O Swoop respeita as regras dos servidores:
 | 1 ✅ | Motor de download com links diretos + CLI | 5 mortes + retomada, sha256 ok (128 MiB e 1 GiB); limite 2,03/5,02 MiB/s; conexão lenta 1,22× |
 | 2a ✅ | Tela de downloads: adicionar links, pausar/retomar/remover, limite, bandeja (v0.2.0) | testado no app real com o servidor de teste; retoma após reabrir |
 | 2b ✅ | Histórico, opções salvas, pasta automática por tipo, notificações, painel no navegador (`serve`) (v0.3.0) | Playwright: pausar tudo zera em ≤ 1 s e 3 × 24 MB certos; 50 retratos em 10 s |
-| 3 | Pixeldrain, Mediafire, Google Drive + coletor de links | fixtures + downloads reais com hash |
+| 3a ✅ | Pixeldrain, Mediafire e Google Drive (pastas viram arquivos), regras editáveis, `swoop-cli check`/`resolve` (v0.4.0) | fixtures de cada caso; link expirado → 1 re-resolução e segue do ponto; testes de rede prontos ⏳ |
+| 3b | Coletor de links (verificar antes de baixar) e pacotes recolhíveis | Playwright do coletor |
 | 4 | Janela de captcha, fastfile.cc (XFS), contas premium | 3 downloads grátis seguidos; segredo fora do disco |
 | 5 | Extração com 7-Zip | RAR5 multiparte com senha; zip-slip bloqueado |
 | 6 | Mega e Gofile | MAC do Mega ok; retomar 1 GiB |
@@ -67,6 +68,19 @@ cargo run --release -p swoop-cli -- list        # mostra a fila
 
 # painel no navegador (127.0.0.1): imprime o endereço com o token
 cargo run --release -p swoop-cli -- serve --ui ui/dist
+
+# confere links sem baixar (aceita texto com links no meio; pastas são abertas)
+cargo run --release -p swoop-cli -- check "https://pixeldrain.com/u/abc123 https://drive.google.com/file/d/…/view"
+# mostra o link direto e grava as respostas lidas como fixtures (conferir antes de commitar)
+cargo run --release -p swoop-cli -- resolve "https://www.mediafire.com/file/…/file" --dump-fixtures fx/
+```
+
+**Servidores (fase 3a):** Pixeldrain, Mediafire e Google Drive, além de links diretos. Links de pasta (Drive, Mediafire) e de lista (Pixeldrain) viram um download por arquivo. Captcha, arquivo marcado como perigoso ou com senha, e "muitos downloads" do Drive não são contornados: o download mostra o motivo (ou espera, no caso da cota).
+
+**Regras dos servidores:** seletores, endereços e textos que o Swoop procura nas páginas ficam em `rules/hosts.toml` (embutido). Para corrigir uma mudança de site sem esperar versão nova, crie `<pasta de dados>/rules/hosts.toml` só com o que muda, por exemplo:
+```toml
+[mediafire]
+download_selector = "a#novoBotao"
 ```
 
 **Pastas automáticas:** sem pasta escolhida ao adicionar, vídeos vão para `Vídeos\Swoop`, áudio para `Músicas\Swoop` e o resto para `Downloads\Swoop` (trocáveis em Opções).
@@ -97,7 +111,7 @@ No app, o X da janela só esconde: os downloads continuam e o ícone da bandeja 
 | `crates/net` | cliente HTTP (rustls + ring, HTTP/1.1) e parsers de cabeçalhos |
 | `crates/store` | SQLite numa thread própria: fila, segmentos para retomada, histórico |
 | `crates/engine` | motor: agendador, segmentos com divisão dinâmica, escritora, limite de velocidade |
-| `crates/hosts` | plugins de servidores (fase 1: link direto) |
+| `crates/hosts` | plugins de servidores: link direto, Pixeldrain, Mediafire, Google Drive; regras em `rules/hosts.toml`; `detect` (links num texto) |
 | `crates/service` | liga banco + motor + plugins; trava de instância única; implementa `Backend` |
 | `crates/remote` | painel no navegador: arquivos da UI + API HTTP/WebSocket em 127.0.0.1, com token |
 | `crates/testsrv` | servidor HTTP de teste com Range e falhas simuladas (só testes) |
@@ -107,6 +121,7 @@ No app, o X da janela só esconde: os downloads continuam e o ícone da bandeja 
 | `apps/swoop` | app desktop Tauri: comandos (`exec`, `list`, `subscribe` via Channel), bandeja, encerramento |
 | `apps/swoop-cli` | o mesmo motor sem janela |
 | `ui/` | interface React + TypeScript: `transport/` (IPC do Tauri; HTTP na v0.3.0), `downloads/` (tela), `gen/` (tipos gerados, não editar) |
+| `rules/hosts.toml` | regras dos servidores (dados, sobrescrevíveis pelo usuário) |
 | `docs/` | desenho e decisões |
 
 O crate `extract` chega na fase 5.

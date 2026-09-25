@@ -1,0 +1,50 @@
+# Regras dos servidores (só dados). Vão embutidas no Swoop e podem ser
+# sobrescritas sem recompilar por <pasta de dados>/rules/hosts.toml: o arquivo
+# de lá só precisa ter as chaves que mudam (é mesclado por cima deste).
+# Nenhum segredo aqui: contas e chaves ficam no cofre do sistema (fase 4).
+
+version = 1
+# Navegador que as páginas dos servidores esperam ver.
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+
+[pixeldrain]
+hosts = ["pixeldrain.com", "pixeldrain.net", "pixeldra.in"]
+api = "https://pixeldrain.com/api"
+# O gratuito é por arquivo e com cota diária: uma conexão por arquivo.
+max_connections = 1
+
+[mediafire]
+hosts = ["mediafire.com"]
+api = "https://www.mediafire.com/api/1.5"
+# Botão de download na página do arquivo; o link pode vir embaralhado (base64)
+# no atributo `scrambled_attr`.
+download_selector = "a#downloadButton"
+scrambled_attr = "data-scrambled-url"
+# Nome na página (atributo `title` do rótulo do botão).
+name_selector = "div.dl-btn-label"
+# Textos (em minúsculas) de páginas que pedem o navegador.
+captcha_markers = ["g-recaptcha", "verify you are human", "captcha"]
+# Aviso de arquivo perigoso: a página traz um token para "baixar assim mesmo";
+# o Swoop não aceita o risco pelo usuário (pede o navegador).
+danger_markers = ["data-security-token", "potentially dangerous", "may contain malware", "blocked for your protection"]
+password_markers = ["for=\"downloadp\"", "enter password"]
+max_connections = 4
+
+[gdrive]
+hosts = ["drive.google.com", "docs.google.com", "drive.usercontent.google.com"]
+download_url = "https://drive.usercontent.google.com/download"
+# Página "não é possível verificar vírus": o formulário leva ao arquivo.
+confirm_form_selector = "form#download-form"
+# Nome e tamanho na página de confirmação: "arquivo.zip (1.2G)".
+confirm_name_selector = "span.uc-name-size a"
+confirm_size_selector = "span.uc-name-size"
+# Pasta: página embutível; cada item é um link (arquivo ou subpasta). Links
+# de Docs/Planilhas nativos são ignorados (não baixam como arquivo).
+folder_url = "https://drive.google.com/embeddedfolderview"
+folder_entry_selector = "a[href]"
+# Textos (em minúsculas) que identificam cada situação na página.
+quota_markers = ["too many users have viewed or downloaded", "download quota", "cota de download"]
+missing_markers = ["file you have requested does not exist", "arquivo solicitado não existe"]
+# "Muitos usuários": o Drive não diz até quando; tentar de novo depois disso.
+quota_wait_minutes = 60
+max_connections = 4

@@ -21,6 +21,19 @@ pub fn install_crypto_provider() {
     let _ = rustls::crypto::ring::default_provider().install_default();
 }
 
+/// Cliente para as páginas e APIs dos servidores (plugins): cookies da
+/// sessão (alguns fluxos dependem deles), UA de navegador e tempo total
+/// limitado, porque uma página nunca é grande.
+pub fn page_client(user_agent: &str) -> Result<reqwest::Client, reqwest::Error> {
+    install_crypto_provider();
+    reqwest::Client::builder()
+        .user_agent(user_agent)
+        .cookie_store(true)
+        .connect_timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(30))
+        .build()
+}
+
 /// Cliente para baixar arquivos (sonda e segmentos).
 pub fn download_client(user_agent: &str) -> Result<reqwest::Client, reqwest::Error> {
     install_crypto_provider();

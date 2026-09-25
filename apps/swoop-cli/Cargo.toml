@@ -13,6 +13,8 @@ path = "src/main.rs"
 [dependencies]
 swoop-core.workspace = true
 swoop-engine.workspace = true
+swoop-hosts.workspace = true
+swoop-net.workspace = true
 swoop-remote.workspace = true
 swoop-service.workspace = true
 swoop-store.workspace = true
@@ -21,6 +23,7 @@ eyre.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+url.workspace = true
 
 [dev-dependencies]
 swoop-testsrv.workspace = true

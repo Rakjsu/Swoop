@@ -32,7 +32,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 license = "MIT"
 rust-version = "1.93"
@@ -60,7 +60,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-notification = "2"
 
 # rede (rustls com ring: sem aws-lc/NASM no Windows)
-reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "stream", "system-proxy"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "stream", "system-proxy", "cookies"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 url = { version = "2", features = ["serde"] }
 http = "1"
@@ -70,6 +70,12 @@ bytes = "1"
 
 # banco
 rusqlite = { version = "0.40", features = ["bundled"] }
+
+# páginas dos servidores (plugins)
+scraper = "0.27"
+toml = "1"
+regex = "1"
+base64 = "0.22"
 
 # disco / hash
 fs4 = "1"
