@@ -15,7 +15,7 @@ pub mod download;
 mod release;
 mod version;
 
-pub use download::download;
+pub use download::{cleanup, download};
 pub use release::{Asset, GhRelease, Update, parse_sums, select};
 pub use version::Version;
 

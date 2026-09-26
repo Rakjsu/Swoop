@@ -27,6 +27,9 @@ pub use settle::EngineEvent;
 
 /// Re-resoluções seguidas (link expirando, arquivo mudando) antes de desistir.
 const MAX_RERESOLVES: u32 = 3;
+/// Link que entrega uma página (HTML) em vez do arquivo, mesmo resolvido de novo.
+const PAGE_NOT_FILE: &str = "o servidor mandou uma página em vez do arquivo \
+     (link expirado, limite do servidor ou o site mudou)";
 
 /// Dependências de um job.
 #[derive(Clone)]
@@ -62,9 +65,22 @@ async fn drive(ctx: &JobCtx, id: DownloadId) -> Result<u64, TransferError> {
     let mut captcha = captcha_answer(ctx, id).await?;
 
     let mut attempt = 0;
+    let mut page_retried = false;
     loop {
         let resolved = Arc::new(resolve(ctx, &url, attempt, captcha.take()).await?);
         let probe = match probe::probe(&ctx.client, &resolved).await {
+            // Página no lugar do arquivo: resolver de novo uma vez; se vier
+            // página outra vez, falhar sem gravar nada.
+            Ok(p) if p.page && !page_retried => {
+                page_retried = true;
+                attempt += 1;
+                tracing::info!(
+                    id = id.0,
+                    "o servidor mandou uma página; resolvendo de novo"
+                );
+                continue;
+            }
+            Ok(p) if p.page => return Err(TransferError::Fatal(PAGE_NOT_FILE.into())),
             Ok(p) => p,
             Err(f) => match from_failure(ctx.resolver.as_ref(), &resolved.host_key, &f) {
                 // Link recém-resolvido já negado: resolver de novo (ainda em `resolving`).

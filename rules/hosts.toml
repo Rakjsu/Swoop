@@ -60,8 +60,13 @@ download2_op = "download2"
 free_field = "method_free"
 free_value = "Free Download"
 # Contador da página do download grátis (segundos).
-countdown_selector = "span.seconds, span#countdown span, #countdown_str span"
+countdown_selector = "span.seconds, span#countdown span, #countdown_str span, #countdown, .countdown .seconds, #seconds"
 max_countdown_secs = 600
+# Contador escrito no JavaScript da página (var countdown = 60; seconds: 60).
+countdown_script_pattern = "(?i)\\b(?:countdown|seconds|timer|wait_?time|count)\\s*[:=]\\s*['\"]?(\\d{1,4})\\b"
+# Sem contador legível na página, esperar isto antes do formulário final
+# (o fastfile.cc pede 60 s mesmo com captcha).
+fallback_countdown_secs = 60
 # Espera entre downloads (grupos: horas, minutos, segundos).
 wait_pattern = "(?:you have to wait|please wait|wait)\\s+(?:(\\d+)\\s*hours?,?\\s*)?(?:(\\d+)\\s*minutes?,?\\s*)?(?:(\\d+)\\s*seconds?)?\\s*(?:till|until|before) (?:the )?next download"
 size_pattern = "\\((\\d+(?:[.,]\\d+)?\\s*[KMGT]?B)\\)"
@@ -69,10 +74,12 @@ size_pattern = "\\((\\d+(?:[.,]\\d+)?\\s*[KMGT]?B)\\)"
 premium_markers = ["available for premium users only", "only premium users can download", "premium members only"]
 offline_markers = ["file not found", "no such file", "file was removed", "file has been removed", "the file you were looking for could not be found"]
 wrong_captcha_markers = ["wrong captcha"]
-skipped_countdown_markers = ["skipped countdown"]
+skipped_countdown_markers = ["skipped countdown", "you can not download so fast", "too fast", "please wait for the countdown"]
 cloudflare_markers = ["cf-browser-verification", "challenge-platform", "just a moment..."]
 # Link final na página depois do formulário (quando não vem redirecionamento).
 direct_link_selector = "span#direct_link a[href], a#downloadbtn[href], a.btn-download[href]"
+# Link final num redirecionamento por JavaScript (location.href = '…').
+final_script_pattern = "(?:location(?:\\.href)?|location\\.replace\\()\\s*=?\\s*['\"](https?://[^'\"]+)['\"]"
 # Captcha próprio do site: imagem ou dígitos posicionados.
 image_captcha_selector = "img[src*='/captchas/']"
 digits_captcha_selector = "td[align=right] > div[style*='padding-left'], div.captcha_code"

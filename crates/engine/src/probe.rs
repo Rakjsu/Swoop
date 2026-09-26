@@ -15,6 +15,9 @@ pub struct Probe {
     pub etag: Option<String>,
     pub last_modified: Option<String>,
     pub disposition_name: Option<String>,
+    /// A resposta é uma página (HTML sem ser anexo), não o arquivo: link
+    /// expirado, limite do servidor ou site que mudou.
+    pub page: bool,
 }
 
 impl Probe {
@@ -25,6 +28,21 @@ impl Probe {
             .filter(|e| !e.starts_with("W/"))
             .or_else(|| self.last_modified.clone())
     }
+}
+
+/// HTML que não vem como anexo é página, não arquivo (um `.rar` mandado com
+/// `text/html` mas como anexo continua valendo).
+fn is_page(content_type: Option<&str>, disposition: Option<&str>) -> bool {
+    let html = content_type.is_some_and(|t| {
+        let t = t.trim_start().to_ascii_lowercase();
+        t.starts_with("text/html") || t.starts_with("application/xhtml")
+    });
+    let attachment = disposition.is_some_and(|d| {
+        d.trim_start()
+            .to_ascii_lowercase()
+            .starts_with("attachment")
+    });
+    html && !attachment
 }
 
 /// Faz a sonda. Erro HTTP/rede vira `HttpFailure` para o resolvedor classificar.
@@ -49,6 +67,10 @@ pub async fn probe(
         text(header::CONTENT_DISPOSITION).and_then(|v| swoop_net::parse_content_disposition(&v));
     let etag = text(header::ETAG);
     let last_modified = text(header::LAST_MODIFIED);
+    let page = is_page(
+        text(header::CONTENT_TYPE).as_deref(),
+        text(header::CONTENT_DISPOSITION).as_deref(),
+    );
 
     let probe = match status {
         StatusCode::PARTIAL_CONTENT => {
@@ -60,6 +82,7 @@ pub async fn probe(
                 etag,
                 last_modified,
                 disposition_name,
+                page,
             }
         }
         StatusCode::OK => Probe {
@@ -71,6 +94,7 @@ pub async fn probe(
             etag,
             last_modified,
             disposition_name,
+            page,
         },
         _ => return Err(request::status_failure(status, headers, SystemTime::now())),
     };

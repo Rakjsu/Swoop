@@ -2,6 +2,7 @@
 //! (formulário `download1`), a página do download grátis (contador, captcha,
 //! formulário `download2`) e a página final (link direto ou erro).
 
+use super::scan;
 use crate::page::{self, human_size};
 use crate::rules::XfsRules;
 use regex::Regex;
@@ -65,6 +66,8 @@ pub enum Step {
 pub struct Free {
     pub form: Form,
     pub countdown_secs: u64,
+    /// O contador foi lido na página (senão vale a espera padrão das regras).
+    pub countdown_found: bool,
     /// Captcha e o campo da resposta.
     pub captcha: Option<(CaptchaKind, String)>,
 }
@@ -134,6 +137,9 @@ pub fn final_page(
         || form_with_op(&doc, &rules.download1_op)?.is_some()
     {
         return Ok(Final::Again);
+    }
+    if let Some(link) = scan::final_link(&doc, page_url, rules)? {
+        return Ok(Final::Link(link));
     }
     Err(HostError::Changed(
         "página final do XFileSharing sem o link".into(),
@@ -212,19 +218,11 @@ fn is_method(i: &ElementRef<'_>) -> bool {
 /// Página do download grátis: contador e captcha.
 fn free(doc: &Html, mut form: Form, page_url: &Url, rules: &XfsRules) -> Result<Free, HostError> {
     form.fields.retain(|(k, _)| k != "method_premium");
-    let countdown_secs = page::text(doc, &rules.countdown_selector)?
-        .and_then(|t| {
-            t.chars()
-                .filter(char::is_ascii_digit)
-                .collect::<String>()
-                .parse()
-                .ok()
-        })
-        .unwrap_or(0u64)
-        .min(rules.max_countdown_secs);
+    let (countdown_secs, countdown_found) = scan::countdown(doc, rules)?;
     Ok(Free {
         form,
         countdown_secs,
+        countdown_found,
         captcha: captcha(doc, page_url, rules)?,
     })
 }

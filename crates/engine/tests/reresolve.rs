@@ -70,3 +70,61 @@ async fn link_expirado_resolve_uma_vez_e_continua() {
         "baixou de novo o que já tinha ({sent} bytes)"
     );
 }
+
+/// Plugin de teste: entrega os links da lista em ordem (o último se repete).
+struct Links {
+    urls: Vec<String>,
+    calls: AtomicU32,
+}
+
+#[async_trait]
+impl Resolver for Links {
+    async fn resolve(&self, _req: &ResolveRequest) -> Result<Resolved, HostError> {
+        let i = self.calls.fetch_add(1, Ordering::SeqCst) as usize;
+        let url = &self.urls[i.min(self.urls.len() - 1)];
+        Ok(Resolved::direct(Url::parse(url).unwrap()))
+    }
+}
+
+async fn run_links(urls: Vec<String>) -> (swoop_store::DownloadRow, u32, std::path::PathBuf) {
+    let links = Arc::new(Links {
+        urls,
+        calls: AtomicU32::new(0),
+    });
+    let h = Harness::with_resolver(settings(2), links.clone()).await;
+    let id = h.add("https://servidor.test/arquivo".into()).await;
+    let row = h.wait_final(&[id], Duration::from_secs(20)).await.remove(0);
+    (row, links.calls.load(Ordering::SeqCst), h.dest())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn pagina_no_lugar_do_arquivo_resolve_de_novo_uma_vez() {
+    let srv = TestServer::start().await.unwrap();
+    let page = srv.file_url("erro.bin", "size=2048&ctype=text/html;%20charset=utf-8");
+    let good = srv.file_url("bom.bin", "size=65536&seed=3");
+    let (row, calls, _) = run_links(vec![page, good]).await;
+    completed(&row);
+    assert_eq!(calls, 2, "uma re-resolução");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn pagina_sempre_falha_sem_gravar_nada() {
+    let srv = TestServer::start().await.unwrap();
+    let page = srv.file_url("erro.html", "size=2048&ctype=text/html");
+    let (row, calls, dest) = run_links(vec![page]).await;
+    assert_eq!(row.state, swoop_core::DownloadState::Failed);
+    let msg = row.error_msg.unwrap_or_default();
+    assert!(msg.contains("página em vez do arquivo"), "{msg}");
+    assert_eq!(calls, 2);
+    let files = std::fs::read_dir(&dest).map_or(0, |d| d.count());
+    assert_eq!(files, 0, "nada gravado em {}", dest.display());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn html_como_anexo_ainda_e_arquivo() {
+    let srv = TestServer::start().await.unwrap();
+    let file = srv.file_url("pagina.html", "size=4096&ctype=text/html&cd=1");
+    let (row, calls, _) = run_links(vec![file]).await;
+    completed(&row);
+    assert_eq!(calls, 1);
+}

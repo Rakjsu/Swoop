@@ -10,6 +10,7 @@
 mod account;
 mod parse;
 mod premium;
+mod scan;
 
 use crate::page::{self, Page};
 use crate::plugin::{FileInfo, HostCtx, HostPlugin};
@@ -73,27 +74,41 @@ impl Xfs {
     /// Página do download grátis a partir da página do arquivo.
     async fn free_page(ctx: &HostCtx, url: &Url) -> Result<(Page, Option<parse::Free>), HostError> {
         let rules = &ctx.rules.xfs;
+        let host = site_key(url);
         let first = page::get(ctx, url).await?;
         if first.file {
             return Ok((first, None));
         }
-        let free = match parse::step(&first.body, &first.url, rules, SystemTime::now())? {
+        let step = parse::step(&first.body, &first.url, rules, SystemTime::now())
+            .map_err(|e| ctx.changed(&host, "pagina", &first.body, e))?;
+        let free = match step {
             Step::Download2(free) => free,
             Step::Download1 { form, .. } => {
+                tracing::info!(host, "xfs: enviando download1");
                 let second = page::post_form(ctx, &form.target(&first.url), &form.fields).await?;
                 if second.file {
                     return Ok((second, None));
                 }
-                match parse::step(&second.body, &second.url, rules, SystemTime::now())? {
+                let step = parse::step(&second.body, &second.url, rules, SystemTime::now())
+                    .map_err(|e| ctx.changed(&host, "gratis", &second.body, e))?;
+                match step {
                     Step::Download2(free) => free,
                     Step::Download1 { .. } => {
-                        return Err(HostError::Changed(
-                            "o XFileSharing não abriu o download grátis".into(),
-                        ));
+                        let e =
+                            HostError::Changed("o XFileSharing não abriu o download grátis".into());
+                        return Err(ctx.changed(&host, "gratis", &second.body, e));
                     }
                 }
             }
         };
+        match free.countdown_found {
+            true => tracing::info!(host, secs = free.countdown_secs, "xfs: contador lido"),
+            false => tracing::info!(
+                host,
+                secs = free.countdown_secs,
+                "xfs: contador não encontrado na página; esperando o padrão das regras"
+            ),
+        }
         Ok((first, Some(free)))
     }
 
@@ -104,11 +119,21 @@ impl Xfs {
         fields: &[(String, String)],
         referer: &Url,
     ) -> Result<Option<Resolved>, HostError> {
+        let host = site_key(referer);
+        tracing::info!(host, "xfs: enviando download2");
         let res = page::post_form(ctx, action, fields).await?;
+        tracing::info!(
+            host,
+            status = res.status,
+            arquivo = res.file,
+            "xfs: resposta do download2"
+        );
         if res.file {
             return Ok(Some(Self::resolved(ctx, res.url, referer, false)));
         }
-        match parse::final_page(&res.body, &res.url, &ctx.rules.xfs, SystemTime::now())? {
+        let fin = parse::final_page(&res.body, &res.url, &ctx.rules.xfs, SystemTime::now())
+            .map_err(|e| ctx.changed(&host, "final", &res.body, e))?;
+        match fin {
             Final::Link(link) => Ok(Some(Self::resolved(ctx, link, referer, false))),
             Final::Again => Ok(None),
         }

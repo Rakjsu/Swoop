@@ -69,6 +69,11 @@ pub struct XfsRules {
     pub free_field: String,
     pub free_value: String,
     pub countdown_selector: String,
+    /// Contador escrito num `<script>` (grupo 1 = segundos).
+    pub countdown_script_pattern: String,
+    /// Espera quando a página não mostra o contador de forma legível: o
+    /// formulário final nunca sai antes disso.
+    pub fallback_countdown_secs: u64,
     /// Teto do contador aceito (segundos); acima disso é "espere até o
     /// próximo download".
     pub max_countdown_secs: u64,
@@ -82,6 +87,8 @@ pub struct XfsRules {
     pub skipped_countdown_markers: Vec<String>,
     pub cloudflare_markers: Vec<String>,
     pub direct_link_selector: String,
+    /// Link final num redirecionamento por `<script>` (grupo 1 = URL).
+    pub final_script_pattern: String,
     pub image_captcha_selector: String,
     pub digits_captcha_selector: String,
     /// Download grátis: conexões e retomada.

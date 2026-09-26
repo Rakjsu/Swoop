@@ -8,7 +8,10 @@
 //!
 //! Botões (query): `countdown` (s, padrão 2), `wait_between` (s depois de
 //! cada link entregue), `premium_only=1`, `captcha=recaptcha|image|none`,
-//! `name`, `size`, `seed`. Conta premium: `xfs_premium`.
+//! `name`, `size`, `seed`, `countdown_hidden=1` (exige a espera sem mostrar o
+//! número), `final=meta|script` (link final numa página, não em 302),
+//! `final=blank` (página final sem link nenhum). Conta
+//! premium: `xfs_premium`.
 
 use axum::Form;
 use axum::extract::{Path, Query, State};
@@ -30,6 +33,9 @@ pub struct XfsKnobs {
     pub name: Option<String>,
     pub size: u64,
     pub seed: u64,
+    pub countdown_hidden: u8,
+    #[serde(rename = "final")]
+    pub final_page: String,
 }
 
 impl Default for XfsKnobs {
@@ -42,6 +48,8 @@ impl Default for XfsKnobs {
             name: None,
             size: 1 << 20,
             seed: 1,
+            countdown_hidden: 0,
+            final_page: String::new(),
         }
     }
 }
@@ -139,9 +147,13 @@ pub async fn form(
         return crate::xfs_premium::redirect(&st, &code);
     }
     let mut g = st.0.lock().unwrap();
+    let host = headers
+        .get(header::HOST)
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("127.0.0.1");
     match fields.get("op").map(String::as_str) {
         Some("download1") => download1(&mut g, &code, &k),
-        Some("download2") => download2(&mut g, &code, &k, &fields),
+        Some("download2") => download2(&mut g, &code, &k, &fields, host),
         _ => (StatusCode::BAD_REQUEST, "op?").into_response(),
     }
 }
@@ -173,15 +185,21 @@ fn free_page(code: &str, k: &XfsKnobs, rand: &str, note: &str) -> String {
         "image" => "<img src=\"/captchas/test.jpg\"><input type=\"text\" name=\"code\">",
         _ => "",
     };
+    let wait = match k.countdown_hidden {
+        1 => "<div>Please wait before downloading</div>".to_owned(),
+        _ => format!(
+            "<div>Wait <span class=\"seconds\">{}</span> seconds</div>",
+            k.countdown
+        ),
+    };
     format!(
-        "<html><body>{note}<div>Wait <span class=\"seconds\">{}</span> seconds</div>\
+        "<html><body>{note}{wait}\
          <form name=\"F1\" method=\"POST\" action=\"\">\
          <input type=\"hidden\" name=\"op\" value=\"download2\">\
          <input type=\"hidden\" name=\"id\" value=\"{code}\">\
          <input type=\"hidden\" name=\"rand\" value=\"{rand}\">\
          <input type=\"hidden\" name=\"method_free\" value=\"Free Download\">\
-         {captcha}</form></body></html>",
-        k.countdown
+         {captcha}</form></body></html>"
     )
 }
 
@@ -190,6 +208,7 @@ fn download2(
     code: &str,
     k: &XfsKnobs,
     fields: &HashMap<String, String>,
+    host: &str,
 ) -> Response {
     let rand = fields.get("rand").cloned().unwrap_or_default();
     let Some(issued) = g.issued.get(&rand).copied() else {
@@ -220,5 +239,17 @@ fn download2(
         k.size,
         k.seed
     );
-    (StatusCode::FOUND, [(header::LOCATION, target)]).into_response()
+    let absolute = format!("http://{host}{target}");
+    match k.final_page.as_str() {
+        "meta" => Html(format!(
+            "<html><head><meta http-equiv=\"refresh\" content=\"0; url={absolute}\"></head></html>"
+        ))
+        .into_response(),
+        "script" => Html(format!(
+            "<html><body><script>window.location.href = \"{absolute}\";</script></body></html>"
+        ))
+        .into_response(),
+        "blank" => Html("<html><body>Obrigado por baixar</body></html>").into_response(),
+        _ => (StatusCode::FOUND, [(header::LOCATION, target)]).into_response(),
+    }
 }

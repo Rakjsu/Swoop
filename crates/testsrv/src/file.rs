@@ -82,9 +82,11 @@ pub async fn serve(
     *resp.status_mut() = status;
     let h = resp.headers_mut();
     h.insert(header::CONTENT_LENGTH, (end - start).into());
+    let ctype = k.ctype.as_deref().unwrap_or("application/octet-stream");
     h.insert(
         header::CONTENT_TYPE,
-        HeaderValue::from_static("application/octet-stream"),
+        HeaderValue::from_str(ctype)
+            .unwrap_or(HeaderValue::from_static("application/octet-stream")),
     );
     if let Ok(v) = HeaderValue::from_str(&etag) {
         h.insert(header::ETAG, v);

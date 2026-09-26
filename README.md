@@ -22,7 +22,7 @@ O Swoop respeita as regras dos servidores:
 2. O instalador ainda não tem assinatura de código, então o Windows pode mostrar "O Windows protegeu o computador". Clique em **Mais informações → Executar assim mesmo**.
 3. Aceite o pedido de administrador e clique em **Instalar**. O Swoop vai para `C:\Program Files\Swoop`, com atalhos no Menu Iniciar e na área de trabalho.
 
-**Atualizações:** ao abrir, e a cada 6 h, o app procura versão nova nas Releases. Se houver, aparece a faixa "Versão X disponível — **Atualizar**". O clique baixa o instalador, confere o sha256 publicado, pede o administrador e reabre o Swoop atualizado.
+**Atualizações:** ao abrir, e a cada 6 h, o app procura versão nova nas Releases. Se houver, aparece a faixa "Versão X disponível — **Atualizar**". O clique baixa o instalador, confere o sha256 publicado, pede o administrador e reabre o Swoop atualizado; o instalador baixado é apagado quando o Swoop abre de novo.
 
 **Alternativa:** `Swoop_<versão>_x64-setup.exe` é o instalador NSIS padrão. Ele também instala o WebView2 se estiver faltando.
 
@@ -79,6 +79,8 @@ cargo run --release -p swoop-cli -- resolve "https://www.mediafire.com/file/…/
 **Servidores (fase 3a):** Pixeldrain, Mediafire e Google Drive, além de links diretos. Links de pasta (Drive, Mediafire) e de lista (Pixeldrain) viram um download por arquivo. Captcha, arquivo marcado como perigoso ou com senha, e "muitos downloads" do Drive não são contornados: o download mostra o motivo (ou espera, no caso da cota).
 
 **Captcha e XFileSharing (fase 4a):** links de fastfile.cc, katfile.com e ddownload.com (outros sites XFileSharing entram pelas regras) seguem o caminho grátis do site: o Swoop clica os botões e conta o tempo sozinho; quando o site pede captcha, o download fica em **Captcha pendente**, chega um aviso do Windows e o botão **Resolver captcha** abre uma janela só com o captcha do site. Ao resolver, a janela fecha e o download continua depois do contador (nunca antes). "Espere N minutos até o próximo download" vale para o servidor inteiro, inclusive depois de fechar e reabrir o app. Pelo painel no navegador o captcha não se resolve: ele avisa para usar o app do computador.
+
+**Quando algo falha:** o log fica em `%LOCALAPPDATA%\io.github.rakjsu.swoop\logs\swoop.log` e, quando um servidor muda a página e o Swoop não entende, a página recebida fica em `…\diagnostico\` (o erro na lista diz o caminho). Mandar esses arquivos ajuda a corrigir o plugin. Um link que entrega uma página (HTML) em vez do arquivo falha com aviso, sem salvar nada.
 
 **Contas premium (fase 4b):** na aba **Contas** (só no app do computador), escolha o servidor (fastfile.cc, katfile.com, ddownload.com) e informe usuário e senha ou a chave da API do site ("My Account"). A senha ou chave vai direto para o cofre do sistema (no Windows, o Gerenciador de Credenciais); o banco do Swoop guarda só o nome da entrada. O Swoop confere a conta no site (premium e validade) e, com premium, baixa sem contador nem captcha, com 5 conexões e retomada. O painel no navegador não mexe em contas.
 

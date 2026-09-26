@@ -2,9 +2,11 @@
 //! a interface (`update://available`) e, quando o usuário pede, baixa o
 //! instalador, confere o sha256 e o executa em modo passivo.
 //!
-//! O instalador NSIS (`/P /UPDATE /R`) fecha o Swoop aberto, troca os
-//! arquivos em Arquivos de Programas (pede UAC) e reabre o app como usuário
-//! comum. Em dev só procura com `SWOOP_UPDATE_CHECK=1`.
+//! O instalador NSIS (`/P /UPDATE /R`) troca os arquivos em Arquivos de
+//! Programas (pede UAC) e reabre o app como usuário comum. O motor é fechado
+//! *antes* de abrir o instalador: se o Swoop ainda estiver aberto quando o
+//! NSIS conferir, ele pede para fechar. Em dev só procura com
+//! `SWOOP_UPDATE_CHECK=1`.
 
 use serde::Serialize;
 use std::sync::Mutex;
@@ -12,6 +14,31 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use swoop_update::{Source, Update, Version};
 use tauri::{AppHandle, Emitter, Manager, State};
+
+/// Pasta temporária dos instaladores baixados.
+fn installers_dir() -> std::path::PathBuf {
+    std::env::temp_dir().join("swoop-update")
+}
+
+/// Apaga o instalador da atualização já instalada (e restos de download).
+/// Logo depois de atualizar o setup ainda pode estar fechando e segurar o
+/// arquivo: tenta algumas vezes, em segundo plano.
+pub fn spawn_cleanup() {
+    tauri::async_runtime::spawn(async {
+        let dir = installers_dir();
+        for _ in 0..5 {
+            match swoop_update::cleanup(&dir) {
+                Ok(true) => return tracing::info!("instalador da atualização apagado"),
+                Ok(false) => return,
+                Err(_) => tokio::time::sleep(Duration::from_secs(3)).await,
+            }
+        }
+        tracing::warn!(
+            "não consegui apagar o instalador antigo em {}",
+            dir.display()
+        );
+    });
+}
 
 /// Intervalo entre consultas ao GitHub.
 const CHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
@@ -123,7 +150,7 @@ pub async fn install_update(app: AppHandle, state: State<'_, UpdateState>) -> Re
 async fn download_and_run(app: &AppHandle, update: &Update) -> Result<(), String> {
     let client =
         swoop_net::download_client(swoop_net::DEFAULT_USER_AGENT).map_err(|e| e.to_string())?;
-    let dir = std::env::temp_dir().join("swoop-update");
+    let dir = installers_dir();
     let last = Mutex::new(Instant::now() - PROGRESS_EVERY);
     let setup = swoop_update::download(&client, update, &dir, |received, total| {
         let mut last = last.lock().expect("mutex");
@@ -134,7 +161,17 @@ async fn download_and_run(app: &AppHandle, update: &Update) -> Result<(), String
     })
     .await
     .map_err(|e| e.to_string())?;
-    run_installer(&setup)?;
+    // Progresso gravado e janela fechada antes do instalador conferir se o
+    // Swoop está aberto; a saída depois é imediata.
+    crate::engine::stop(app).await;
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+    if let Err(e) = run_installer(&setup) {
+        // O motor já parou: reabrir o app é o jeito de voltar a baixar.
+        tracing::warn!("{e}; reabrindo o Swoop");
+        app.restart();
+    }
     tracing::info!("instalador da versão {} iniciado; saindo", update.version);
     app.exit(0);
     Ok(())

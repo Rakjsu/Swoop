@@ -12,6 +12,7 @@
 //! | `fail`        | fração (0–1) de requisições que recebem 503                   |
 //! | `valid_until` | ms Unix; depois disso responde 403 (link expirado)            |
 //! | `cd=1`        | envia Content-Disposition com o nome                          |
+//! | `ctype`       | Content-Type da resposta (padrão `application/octet-stream`)  |
 
 use serde::Deserialize;
 
@@ -29,6 +30,7 @@ pub struct Knobs {
     pub fail: f64,
     pub valid_until: Option<i64>,
     pub cd: u8,
+    pub ctype: Option<String>,
 }
 
 impl Default for Knobs {
@@ -44,6 +46,7 @@ impl Default for Knobs {
             fail: 0.0,
             valid_until: None,
             cd: 0,
+            ctype: None,
         }
     }
 }

@@ -59,8 +59,9 @@ async fn from_page(ctx: &HostCtx, url: &Url, host: &str) -> Result<Url, HostErro
     if first.file {
         return Ok(first.url);
     }
-    let form = match account::premium_page(&first.body, &first.url, rules, host, SystemTime::now())?
-    {
+    let found = account::premium_page(&first.body, &first.url, rules, host, SystemTime::now())
+        .map_err(|e| ctx.changed(host, "premium", &first.body, e))?;
+    let form = match found {
         Premium::Link(link) => return Ok(link),
         Premium::Form(form) => form,
     };
@@ -68,7 +69,9 @@ async fn from_page(ctx: &HostCtx, url: &Url, host: &str) -> Result<Url, HostErro
     if res.file {
         return Ok(res.url);
     }
-    match account::premium_page(&res.body, &res.url, rules, host, SystemTime::now())? {
+    let found = account::premium_page(&res.body, &res.url, rules, host, SystemTime::now())
+        .map_err(|e| ctx.changed(host, "premium-final", &res.body, e))?;
+    match found {
         Premium::Link(link) => Ok(link),
         Premium::Form(_) => Err(HostError::Changed(format!(
             "o {host} não entregou o link premium"
@@ -88,6 +91,7 @@ async fn login(ctx: &HostCtx, origin: &Url, host: &str, acc: &Account) -> Result
     .map(|(k, v)| (k.to_owned(), v.to_owned()));
     let res = page::post_form(ctx, &at(origin, &rules.login_path)?, &fields).await?;
     account::login_result(&res.body, rules, host)
+        .map_err(|e| ctx.changed(host, "login", &res.body, e))
 }
 
 /// Confere a conta do servidor `host_key`: pela API (chave) ou pela página
