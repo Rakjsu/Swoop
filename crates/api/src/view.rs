@@ -24,6 +24,18 @@ pub struct DownloadView {
     /// Pacote do download (a lista agrupa por ele).
     pub package_id: i64,
     pub package_name: String,
+    /// Captcha esperando o usuário (estado `captcha_needed`).
+    pub captcha: Option<CaptchaInfo>,
+}
+
+/// Captcha pendente, para a interface mostrar e oferecer "Resolver".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+pub struct CaptchaInfo {
+    /// Site que pediu.
+    pub host: String,
+    /// Fim do contador do site (ms Unix); antes disso o envio espera.
+    pub not_before_ms: i64,
 }
 
 /// Um link no coletor.
@@ -86,6 +98,8 @@ pub enum Notice {
     QueueFinished { completed: u32, failed: u32 },
     /// Um download falhou de vez (esgotou as tentativas ou erro sem volta).
     Failed { name: String, message: String },
+    /// Um servidor pediu captcha: o usuário resolve no app.
+    CaptchaNeeded { name: String, host: String },
 }
 
 /// Como um item saiu da fila.
@@ -157,6 +171,7 @@ mod tests {
             final_path: None,
             package_id: 1,
             package_name: "p".into(),
+            captcha: None,
         };
         assert_eq!(serde_json::to_value(view).unwrap()["state"], "downloading");
     }

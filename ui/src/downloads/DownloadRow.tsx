@@ -7,20 +7,22 @@ import { FolderIcon, PauseIcon, PlayIcon, RetryIcon, TrashIcon } from './icons';
 export const ROW_HEIGHT = 56;
 
 /** Ações que uma linha pode pedir. */
-export type RowAction = 'pause' | 'resume' | 'retry' | 'remove' | 'reveal';
+export type RowAction = 'pause' | 'resume' | 'retry' | 'remove' | 'reveal' | 'captcha';
 
 interface Props {
   row: DownloadView;
   live?: LiveRow;
   canReveal: boolean;
+  /** A janela de captcha só existe no desktop. */
+  canSolve: boolean;
   onAction: (action: RowAction, row: DownloadView) => void;
 }
 
 /** Estados em que "pausar" vale (mesma regra de `DownloadState::next`). */
-const PAUSABLE = new Set(['queued', 'resolving', 'downloading', 'verifying', 'waiting']);
+const PAUSABLE = new Set(['queued', 'resolving', 'downloading', 'verifying', 'waiting', 'captcha_needed']);
 
 /** Uma linha da lista: nome, tamanho, barra, velocidade, estado e ações. */
-export function DownloadRow({ row, live, canReveal, onAction }: Props) {
+export function DownloadRow({ row, live, canReveal, canSolve, onAction }: Props) {
   const { done, total } = progressOf(row, live);
   const pct = total ? Math.min(100, (done / total) * 100) : 0;
   const act = (action: RowAction) => () => onAction(action, row);
@@ -32,7 +34,7 @@ export function DownloadRow({ row, live, canReveal, onAction }: Props) {
           {displayName(row)}
         </span>
         <span className={row.error ? 'dl-sub dl-error' : 'dl-sub'}>
-          {row.error ?? hostOf(row.url)}
+          {row.error ?? subText(row, canSolve)}
         </span>
       </div>
       <div className="dl-size" role="cell">
@@ -48,7 +50,13 @@ export function DownloadRow({ row, live, canReveal, onAction }: Props) {
         {live && live.speed_bps > 0 ? formatSpeed(live.speed_bps) : ''}
       </div>
       <div className="dl-status" role="cell">
-        {statusText(row, live)}
+        {row.state === 'captcha_needed' && canSolve ? (
+          <button type="button" className="btn btn-primary btn-solve" onClick={act('captcha')}>
+            Resolver captcha
+          </button>
+        ) : (
+          statusText(row, live)
+        )}
       </div>
       <div className="dl-actions" role="cell">
         {PAUSABLE.has(row.state) && (
@@ -97,6 +105,13 @@ function statusText(row: DownloadView, live?: LiveRow): string {
     return `Aguardando ${formatEta(secs)}`;
   }
   return stateLabel(row.state);
+}
+
+/** Linha de baixo: o site, e onde resolver o captcha pendente. */
+function subText(row: DownloadView, canSolve: boolean): string {
+  const host = hostOf(row.url);
+  if (row.state !== 'captcha_needed') return host;
+  return canSolve ? `${host} pediu um captcha` : `${host} pediu um captcha: resolva no app do computador`;
 }
 
 function hostOf(url: string): string {

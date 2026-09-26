@@ -24,7 +24,7 @@ fn registry() -> Registry {
 }
 
 async fn resolve(reg: &Registry, url: Url) -> Result<swoop_core::Resolved, HostError> {
-    reg.resolve(&ResolveRequest { url, attempt: 0 }).await
+    reg.resolve(&ResolveRequest::new(url)).await
 }
 
 /// Link removido/inexistente vira Offline em até 5 s.

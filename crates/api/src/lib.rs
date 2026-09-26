@@ -16,7 +16,8 @@ pub use backend::{ApiError, Backend, Subscription};
 pub use command::{Command, Reply};
 pub use swoop_core::Settings;
 pub use view::{
-    CollectorView, DownloadView, HistoryOutcome, HistoryView, LiveRow, Notice, Push, Snapshot,
+    CaptchaInfo, CollectorView, DownloadView, HistoryOutcome, HistoryView, LiveRow, Notice, Push,
+    Snapshot,
 };
 
 use serde::Serialize;

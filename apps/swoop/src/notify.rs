@@ -1,5 +1,6 @@
 //! Notificações do sistema a partir dos avisos do serviço (fila terminou,
-//! download falhou), respeitando a preferência "Avisos" das Opções.
+//! download falhou, captcha pendente), respeitando a preferência "Avisos"
+//! das Opções.
 
 use std::sync::Arc;
 use swoop_api::{Backend, Notice, Push};
@@ -38,6 +39,10 @@ fn text(notice: &Notice) -> (String, String) {
         Notice::Failed { name, message } => {
             ("Download falhou".into(), format!("{name}: {message}"))
         }
+        Notice::CaptchaNeeded { name, host } => (
+            "Captcha pendente".into(),
+            format!("{name} ({host}): clique em Resolver no Swoop"),
+        ),
     }
 }
 

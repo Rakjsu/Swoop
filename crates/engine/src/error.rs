@@ -1,7 +1,7 @@
 //! Por que uma transferência parou (decide o próximo estado do download).
 
 use std::time::SystemTime;
-use swoop_core::WaitReason;
+use swoop_core::{CaptchaChallenge, WaitReason};
 
 /// Motivo de parada de uma transferência.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -31,6 +31,9 @@ pub enum TransferError {
     /// Falha de disco (sem espaço, permissão, arquivo travado).
     #[error("erro de disco: {0}")]
     Disk(String),
+    /// O servidor pediu captcha: o download espera o usuário, sem vaga.
+    #[error("captcha pendente")]
+    Captcha(Box<CaptchaChallenge>),
 }
 
 impl From<swoop_store::StoreError> for TransferError {

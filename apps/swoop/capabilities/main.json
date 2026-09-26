@@ -14,6 +14,7 @@
     "allow-settings",
     "allow-subscribe",
     "allow-reveal-download",
+    "allow-solve-captcha",
     "allow-update-status",
     "allow-install-update"
   ]

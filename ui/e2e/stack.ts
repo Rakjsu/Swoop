@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,9 +20,15 @@ export interface Stack {
   stop(): Promise<void>;
 }
 
-/** Sobe o servidor de teste e o painel numa pasta temporária. */
-export async function startStack(): Promise<Stack> {
+/** Sobe o servidor de teste e o painel numa pasta temporária. Com `xfs`,
+ * o testsrv (127.0.0.1) conta como site XFileSharing (override das regras). */
+export async function startStack(opts: { xfs?: boolean } = {}): Promise<Stack> {
   const dir = mkdtempSync(join(tmpdir(), 'swoop-e2e-'));
+  if (opts.xfs) {
+    const rules = join(dir, 'dados', 'rules');
+    mkdirSync(rules, { recursive: true });
+    writeFileSync(join(rules, 'hosts.toml'), '[xfs]\nhosts = ["127.0.0.1"]\n');
+  }
   const srv = spawn(join(BIN_DIR, `swoop-testsrv${EXE}`), ['0'], { stdio: ['ignore', 'pipe', 'inherit'] });
   const srvLine = await firstLine(srv, /http:\/\/[\d.:]+/);
   const serve = spawn(

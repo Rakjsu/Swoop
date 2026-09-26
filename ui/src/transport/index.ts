@@ -24,6 +24,8 @@ export interface Transport {
   onPush(listener: (push: Push) => void): () => void;
   /** Mostra o arquivo no Explorer (só no desktop). */
   revealDownload?(id: number): Promise<void>;
+  /** Abre a janela do captcha de um download (só no desktop). */
+  solveCaptcha?(id: number): Promise<void>;
   /** Janela "Escolher pasta" do sistema (só no desktop). */
   pickFolder?(): Promise<string | null>;
 }

@@ -4,10 +4,11 @@
 use crate::engine::{Active, Inner};
 use crate::job::{self, EngineEvent, JobCtx};
 use crate::progress::JobProgress;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use swoop_core::{DownloadId, Event, Settings};
-use swoop_store::{DownloadRow, downloads, now_ms};
+use swoop_store::{DownloadRow, downloads, host_state, now_ms};
 use url::Url;
 
 /// Sem avisos, o agendador ainda confere a fila neste intervalo (esperas).
@@ -40,14 +41,18 @@ fn reap(inner: &Inner) {
         .retain(|_, a| !a.handle.is_finished());
 }
 
-/// Chave de servidor de um download ainda não resolvido.
+/// Chave de servidor de um download (a da resolução ou o domínio do link).
 fn host_of(row: &DownloadRow) -> String {
-    row.host_key.clone().unwrap_or_else(|| {
-        Url::parse(&row.url)
-            .ok()
-            .and_then(|u| u.host_str().map(str::to_ascii_lowercase))
-            .unwrap_or_default()
-    })
+    row.host_key.clone().unwrap_or_else(|| url_host(row))
+}
+
+/// Domínio do link, sem `www.` (a mesma chave que os plugins usam).
+fn url_host(row: &DownloadRow) -> String {
+    Url::parse(&row.url)
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_ascii_lowercase))
+        .map(|h| h.trim_start_matches("www.").to_owned())
+        .unwrap_or_default()
 }
 
 /// Inicia o que couber.
@@ -63,15 +68,23 @@ async fn fill(inner: &Arc<Inner>) -> Result<(), swoop_store::StoreError> {
     if free_slots(inner, &settings) == 0 {
         return Ok(());
     }
-    let queued = inner
+    let (queued, waiting) = inner
         .store
-        .call(|c| downloads::queued(c, QUEUE_PEEK))
+        .call(|c| {
+            let waits = host_state::active(c, now_ms())?;
+            Ok((downloads::queued(c, QUEUE_PEEK)?, waits))
+        })
         .await?;
+    // Servidores que mandaram esperar antes do próximo download.
+    let blocked: HashSet<String> = waiting.into_iter().map(|w| w.host_key).collect();
     for row in queued {
         if free_slots(inner, &settings) == 0 || inner.shutdown.is_cancelled() {
             break;
         }
         let host = host_of(&row);
+        if blocked.contains(&host) || blocked.contains(&url_host(&row)) {
+            continue;
+        }
         let Some(grant) = grant_for(inner, &settings, &host, row.id) else {
             continue;
         };
@@ -126,6 +139,7 @@ fn spawn_job(inner: &Arc<Inner>, settings: &Settings, id: DownloadId, host: Stri
         limiter: inner.limiter.clone(),
         settings: settings.clone(),
         granted_conns: grant,
+        host: host.clone(),
         cancel: cancel.clone(),
         progress: progress.clone(),
         events: inner.events_tx.clone(),

@@ -4,6 +4,7 @@
 //! painel remoto.
 
 mod backend;
+mod captcha;
 mod collector;
 mod links;
 mod naming;
@@ -46,6 +47,8 @@ pub enum ServiceError {
     BadLink(String),
     #[error("preferências inválidas: {0}")]
     BadSettings(String),
+    #[error("{0}")]
+    BadInput(String),
 }
 
 /// Como abrir o serviço.

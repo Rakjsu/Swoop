@@ -19,6 +19,13 @@ pub struct Shared {
     pub counters: Counters,
     pub generation: Arc<AtomicU64>,
     pub requests: Arc<AtomicU64>,
+    pub xfs: crate::xfs::XfsState,
+}
+
+impl axum::extract::FromRef<Shared> for crate::xfs::XfsState {
+    fn from_ref(s: &Shared) -> Self {
+        s.xfs.clone()
+    }
 }
 
 /// Atende um arquivo (inteiro ou faixa).

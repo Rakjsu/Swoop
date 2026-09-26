@@ -18,6 +18,7 @@ pub struct Rules {
     pub pixeldrain: PixeldrainRules,
     pub mediafire: MediafireRules,
     pub gdrive: GdriveRules,
+    pub xfs: XfsRules,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -53,6 +54,39 @@ pub struct GdriveRules {
     pub missing_markers: Vec<String>,
     pub quota_wait_minutes: u64,
     pub max_connections: u16,
+}
+
+/// Sites XFileSharing (fastfile.cc e parecidos): formulários, contador,
+/// captcha e textos das páginas.
+#[derive(Debug, Clone, Deserialize)]
+pub struct XfsRules {
+    pub hosts: Vec<String>,
+    /// Código do arquivo (um trecho do caminho).
+    pub code_pattern: String,
+    pub download1_op: String,
+    pub download2_op: String,
+    /// Botão do download grátis (nome e valor enviados no formulário).
+    pub free_field: String,
+    pub free_value: String,
+    pub countdown_selector: String,
+    /// Teto do contador aceito (segundos); acima disso é "espere até o
+    /// próximo download".
+    pub max_countdown_secs: u64,
+    /// "Você precisa esperar X horas, Y minutos, Z segundos".
+    pub wait_pattern: String,
+    /// Tamanho escrito na página ("(12.5 MB)").
+    pub size_pattern: String,
+    pub premium_markers: Vec<String>,
+    pub offline_markers: Vec<String>,
+    pub wrong_captcha_markers: Vec<String>,
+    pub skipped_countdown_markers: Vec<String>,
+    pub cloudflare_markers: Vec<String>,
+    pub direct_link_selector: String,
+    pub image_captcha_selector: String,
+    pub digits_captcha_selector: String,
+    /// Download grátis: conexões e retomada.
+    pub free_connections: u16,
+    pub free_resumable: bool,
 }
 
 /// Erro ao ler as regras.

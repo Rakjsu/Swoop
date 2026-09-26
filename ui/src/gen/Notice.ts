@@ -3,4 +3,4 @@
 /**
  * Avisos para o usuário (o app desktop vira notificação do Windows).
  */
-export type Notice = { "kind": "queue_finished", completed: number, failed: number, } | { "kind": "failed", name: string, message: string, };
+export type Notice = { "kind": "queue_finished", completed: number, failed: number, } | { "kind": "failed", name: string, message: string, } | { "kind": "captcha_needed", name: string, host: string, };

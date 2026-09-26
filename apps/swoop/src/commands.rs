@@ -10,8 +10,8 @@ use swoop_api::{
     Settings,
 };
 use swoop_core::DownloadId;
-use tauri::State;
 use tauri::ipc::Channel;
+use tauri::{AppHandle, State};
 
 /// Nome e versão do app, exibidos no cabeçalho.
 #[tauri::command]
@@ -91,4 +91,21 @@ pub async fn reveal_download(state: State<'_, EngineState>, id: i64) -> Result<(
         .ok_or_else(|| ApiError::Invalid("o arquivo ainda não existe no disco".into()))?;
     tauri_plugin_opener::reveal_item_in_dir(&path)
         .map_err(|e| ApiError::Internal(format!("não consegui abrir a pasta: {e}")))
+}
+
+/// Abre a janela para o usuário resolver o captcha do download.
+#[tauri::command]
+pub async fn solve_captcha(
+    app: AppHandle,
+    state: State<'_, EngineState>,
+    id: i64,
+) -> Result<(), ApiError> {
+    let service = state.service()?;
+    let challenge = service
+        .captcha_challenge(DownloadId(id))
+        .await
+        .map_err(ApiError::from)?
+        .ok_or_else(|| ApiError::Invalid("esse download não está esperando captcha".into()))?;
+    crate::captcha::open(&app, service.clone(), DownloadId(id), &challenge)
+        .map_err(|e| ApiError::Internal(format!("não consegui abrir a janela do captcha: {e}")))
 }

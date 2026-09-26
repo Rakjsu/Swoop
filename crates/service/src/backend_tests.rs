@@ -109,6 +109,7 @@ fn linha_do_banco_vira_linha_da_interface() {
         position: 1,
         started_at: None,
         finished_at: None,
+        captcha: None,
     };
     let v = view(row, "pacote".into());
     assert_eq!(v.id, 4);

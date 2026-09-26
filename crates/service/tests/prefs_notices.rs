@@ -111,6 +111,7 @@ async fn pasta_por_tipo_historico_e_avisos() {
                 failed += 1;
             }
             done @ Notice::QueueFinished { .. } => break done,
+            other => panic!("aviso inesperado: {other:?}"),
         }
     };
     assert_eq!(failed, 1);

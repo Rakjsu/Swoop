@@ -3,4 +3,4 @@
 /**
  * Estado persistido de um download.
  */
-export type DownloadState = "queued" | "resolving" | "downloading" | "verifying" | "downloaded" | "completed" | "waiting" | "paused" | "failed";
+export type DownloadState = "queued" | "resolving" | "downloading" | "verifying" | "downloaded" | "completed" | "waiting" | "paused" | "failed" | "captcha_needed";

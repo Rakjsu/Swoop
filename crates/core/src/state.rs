@@ -29,6 +29,8 @@ pub enum DownloadState {
     Waiting,
     Paused,
     Failed,
+    /// O servidor pediu captcha: espera o usuário (sem ocupar vaga).
+    CaptchaNeeded,
 }
 
 /// O que aconteceu com o download (entrada da máquina de estados).
@@ -60,6 +62,10 @@ pub enum Event {
     Fail,
     /// Usuário pediu nova tentativa.
     Retry,
+    /// O servidor pediu captcha.
+    NeedCaptcha,
+    /// O usuário resolveu o captcha: volta para a fila.
+    CaptchaSolved,
 }
 
 /// Transição recusada: o motor tentou algo fora da tabela.
@@ -71,7 +77,7 @@ pub struct InvalidTransition {
 }
 
 impl DownloadState {
-    pub const ALL: [DownloadState; 9] = [
+    pub const ALL: [DownloadState; 10] = [
         Self::Queued,
         Self::Resolving,
         Self::Downloading,
@@ -81,6 +87,7 @@ impl DownloadState {
         Self::Waiting,
         Self::Paused,
         Self::Failed,
+        Self::CaptchaNeeded,
     ];
 
     /// Nome estável usado no banco.
@@ -95,6 +102,7 @@ impl DownloadState {
             Self::Waiting => "waiting",
             Self::Paused => "paused",
             Self::Failed => "failed",
+            Self::CaptchaNeeded => "captcha_needed",
         }
     }
 
@@ -114,8 +122,13 @@ impl DownloadState {
     }
 
     /// Estado ao reabrir o app: o que estava em andamento volta para a fila.
+    /// Captcha pendente também, porque a sessão do site vivia na memória.
     pub fn recover(self) -> Self {
-        if self.is_active() { Self::Queued } else { self }
+        if self.is_active() || self == Self::CaptchaNeeded {
+            Self::Queued
+        } else {
+            self
+        }
     }
 
     /// Aplica um evento; erro se a transição não existe.
@@ -138,6 +151,10 @@ impl DownloadState {
                 S::Paused
             }
             (S::Paused, E::Resume) => S::Queued,
+            (S::Resolving, E::NeedCaptcha) => S::CaptchaNeeded,
+            (S::CaptchaNeeded, E::CaptchaSolved) => S::Queued,
+            (S::CaptchaNeeded, E::Pause) => S::Paused,
+            (S::CaptchaNeeded, E::Fail) => S::Failed,
             (from, event) => return Err(InvalidTransition { from, event }),
         };
         Ok(to)
@@ -156,7 +173,7 @@ mod tests {
     use DownloadState as S;
     use Event as E;
 
-    const EVENTS: [Event; 13] = [
+    const EVENTS: [Event; 15] = [
         E::Start,
         E::Resolved,
         E::Transferred,
@@ -170,6 +187,8 @@ mod tests {
         E::Resume,
         E::Fail,
         E::Retry,
+        E::NeedCaptcha,
+        E::CaptchaSolved,
     ];
 
     /// Tabela completa das transições válidas; todo o resto é recusado.
@@ -194,6 +213,10 @@ mod tests {
         (S::Waiting, E::Pause, S::Paused),
         (S::Paused, E::Resume, S::Queued),
         (S::Failed, E::Retry, S::Queued),
+        (S::Resolving, E::NeedCaptcha, S::CaptchaNeeded),
+        (S::CaptchaNeeded, E::CaptchaSolved, S::Queued),
+        (S::CaptchaNeeded, E::Pause, S::Paused),
+        (S::CaptchaNeeded, E::Fail, S::Failed),
     ];
 
     #[test]
@@ -229,6 +252,7 @@ mod tests {
         assert_eq!(S::Resolving.recover(), S::Queued);
         assert_eq!(S::Verifying.recover(), S::Queued);
         assert_eq!(S::Waiting.recover(), S::Waiting);
+        assert_eq!(S::CaptchaNeeded.recover(), S::Queued);
         assert_eq!(S::Paused.recover(), S::Paused);
         assert_eq!(S::Completed.recover(), S::Completed);
     }

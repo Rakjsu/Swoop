@@ -11,7 +11,7 @@ use crate::rules::Rules;
 use async_trait::async_trait;
 use parse::{Outcome, Target};
 use std::time::SystemTime;
-use swoop_core::{HostError, RangeStyle, Resolved};
+use swoop_core::{HostError, RangeStyle, ResolveRequest, Resolved};
 use swoop_net::reqwest::header;
 use swoop_net::{parse_content_disposition, parse_content_range};
 use url::Url;
@@ -132,12 +132,8 @@ impl HostPlugin for Gdrive {
         }
     }
 
-    async fn resolve(
-        &self,
-        ctx: &HostCtx,
-        url: &Url,
-        _attempt: u32,
-    ) -> Result<Resolved, HostError> {
+    async fn resolve(&self, ctx: &HostCtx, req: &ResolveRequest) -> Result<Resolved, HostError> {
+        let url = &req.url;
         let Target::File(id) = Self::target(ctx, url)? else {
             return Err(HostError::Changed(
                 "é uma pasta do Drive: adicione de novo para abrir os arquivos".into(),

@@ -37,6 +37,7 @@ const LABELS: Record<DownloadState, string> = {
   downloaded: 'Finalizando',
   completed: 'Concluído',
   waiting: 'Aguardando',
+  captcha_needed: 'Captcha pendente',
   paused: 'Pausado',
   failed: 'Falhou',
 };

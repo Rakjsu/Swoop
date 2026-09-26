@@ -53,6 +53,10 @@ export function DownloadsView({ transport, onCollected }: Props) {
         return void transport
           .revealDownload?.(row.id)
           .catch((err: unknown) => setActionError(errorMessage(err)));
+      case 'captcha':
+        return void transport
+          .solveCaptcha?.(row.id)
+          .catch((err: unknown) => setActionError(errorMessage(err)));
     }
   };
 
@@ -104,6 +108,7 @@ export function DownloadsView({ transport, onCollected }: Props) {
                     row={item.row}
                     live={live.get(item.row.id)}
                     canReveal={Boolean(transport.revealDownload)}
+                    canSolve={Boolean(transport.solveCaptcha)}
                     onAction={onAction}
                   />
                 ),
