@@ -8,11 +8,11 @@
 //!
 //! Botões (query): `countdown` (s, padrão 2), `wait_between` (s depois de
 //! cada link entregue), `premium_only=1`, `captcha=recaptcha|image|none`,
-//! `name`, `size`, `seed`.
+//! `name`, `size`, `seed`. Conta premium: `xfs_premium`.
 
 use axum::Form;
 use axum::extract::{Path, Query, State};
-use axum::http::{StatusCode, header};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -55,6 +55,8 @@ pub struct XfsStats {
     pub wrong_answers: u64,
     /// Links entregues.
     pub links: u64,
+    /// Links entregues à conta premium (API ou sessão).
+    pub premium_links: u64,
 }
 
 #[derive(Default)]
@@ -64,6 +66,8 @@ struct Inner {
     blocked_until: Option<Instant>,
     next_rand: u64,
     stats: XfsStats,
+    /// Botões do arquivo entregue ao premium (`size=…&seed=…&rate=…`).
+    premium_file: Option<String>,
 }
 
 /// Estado compartilhado do XFS falso.
@@ -74,6 +78,22 @@ impl XfsState {
     pub fn stats(&self) -> XfsStats {
         self.0.lock().unwrap().stats.clone()
     }
+
+    /// Botões do arquivo que a conta premium recebe.
+    pub fn set_premium_file(&self, query: &str) {
+        self.0.lock().unwrap().premium_file = Some(query.to_owned());
+    }
+
+    pub(crate) fn premium_file(&self) -> String {
+        let g = self.0.lock().unwrap();
+        g.premium_file
+            .clone()
+            .unwrap_or_else(|| "size=1048576&seed=1".into())
+    }
+
+    pub(crate) fn count_premium_link(&self) {
+        self.0.lock().unwrap().stats.premium_links += 1;
+    }
 }
 
 fn file_name(code: &str, k: &XfsKnobs) -> String {
@@ -81,8 +101,15 @@ fn file_name(code: &str, k: &XfsKnobs) -> String {
 }
 
 /// Página do arquivo (com um script "do site", que a janela de captcha não
-/// pode deixar rodar).
-pub async fn page(Path(code): Path<String>, Query(k): Query<XfsKnobs>) -> Html<String> {
+/// pode deixar rodar); com a sessão premium, o formulário premium.
+pub async fn page(
+    headers: HeaderMap,
+    Path(code): Path<String>,
+    Query(k): Query<XfsKnobs>,
+) -> Html<String> {
+    if crate::xfs_premium::session(&headers) {
+        return crate::xfs_premium::page(&code);
+    }
     let name = file_name(&code, &k);
     Html(format!(
         "<html><head><script>window.siteRan = true; document.title = 'script do site';</script>\
@@ -101,10 +128,16 @@ pub async fn page(Path(code): Path<String>, Query(k): Query<XfsKnobs>) -> Html<S
 /// Envio de formulário (`download1` ou `download2`).
 pub async fn form(
     State(st): State<XfsState>,
+    headers: HeaderMap,
     Path(code): Path<String>,
     Query(k): Query<XfsKnobs>,
     Form(fields): Form<HashMap<String, String>>,
 ) -> Response {
+    if fields.get("method_premium").map(String::as_str) == Some("1")
+        && crate::xfs_premium::session(&headers)
+    {
+        return crate::xfs_premium::redirect(&st, &code);
+    }
     let mut g = st.0.lock().unwrap();
     match fields.get("op").map(String::as_str) {
         Some("download1") => download1(&mut g, &code, &k),

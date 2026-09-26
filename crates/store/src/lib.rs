@@ -5,6 +5,7 @@
 //! `Store::call_blocking` (threads comuns, como a escritora do motor).
 //! Os repositórios são funções sobre `&Connection`, testáveis direto.
 
+pub mod accounts;
 pub mod actor;
 pub mod captcha;
 pub mod collector;

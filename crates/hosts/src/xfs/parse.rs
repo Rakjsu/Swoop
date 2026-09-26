@@ -141,7 +141,7 @@ pub fn final_page(
 }
 
 /// Situações que param o fluxo em qualquer página.
-fn blocked(html: &str, rules: &XfsRules, now: SystemTime) -> Result<(), HostError> {
+pub(super) fn blocked(html: &str, rules: &XfsRules, now: SystemTime) -> Result<(), HostError> {
     let lower = html.to_lowercase();
     let has = |m: &[String]| m.iter().any(|x| lower.contains(x.as_str()));
     if has(&rules.cloudflare_markers) {
@@ -177,7 +177,7 @@ fn wait_secs(lower: &str, rules: &XfsRules) -> Option<u64> {
 
 /// Formulário que envia `op = <op>`, com todos os campos (menos botões de
 /// outros métodos, que o chamador decide).
-fn form_with_op(doc: &Html, op: &str) -> Result<Option<Form>, HostError> {
+pub(super) fn form_with_op(doc: &Html, op: &str) -> Result<Option<Form>, HostError> {
     let forms = page::selector("form")?;
     let inputs = page::selector("input[name]")?;
     for form in doc.select(&forms) {

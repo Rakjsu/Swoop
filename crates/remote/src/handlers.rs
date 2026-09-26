@@ -33,11 +33,16 @@ impl IntoResponse for Failure {
     }
 }
 
-/// `POST /api/v1/exec`: um `Command` → `Reply`.
+/// `POST /api/v1/exec`: um `Command` → `Reply`. Contas não passam pelo
+/// painel: senha e chave só no app do computador.
 pub async fn exec(
     State(s): State<Arc<Shared>>,
     Json(cmd): Json<Command>,
 ) -> Result<Response, Failure> {
+    if cmd.is_account() {
+        let refused = ApiError::Invalid("contas só no app do computador".into());
+        return Ok((StatusCode::FORBIDDEN, Json(refused)).into_response());
+    }
     Ok(Json(s.backend.exec(cmd).await?).into_response())
 }
 

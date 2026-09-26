@@ -82,9 +82,13 @@ pub enum HostError {
     BrowserRequired(String),
     #[error("o arquivo é privado ou exige login")]
     AccessDenied,
-    /// Só contas premium baixam este arquivo (contas entram na v0.7.0).
+    /// Só contas premium baixam este arquivo (aba Contas).
     #[error("o servidor só libera este arquivo para contas premium")]
     PremiumOnly,
+    /// A conta do usuário foi recusada (chave/senha errada, premium vencido).
+    /// A mensagem diz o servidor e o motivo.
+    #[error("{0}")]
+    Account(String),
     /// O servidor pediu um captcha que o usuário resolve na janela do app.
     #[error("o servidor pediu um captcha")]
     Captcha(Box<CaptchaChallenge>),

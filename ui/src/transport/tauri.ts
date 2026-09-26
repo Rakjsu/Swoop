@@ -38,6 +38,7 @@ export const tauriTransport: Transport = {
   },
   revealDownload: (id) => invoke('reveal_download', { id }),
   solveCaptcha: (id) => invoke('solve_captcha', { id }),
+  accounts: () => invoke('accounts'),
   async pickFolder() {
     const dir = await open({ directory: true, title: 'Pasta de destino' });
     return typeof dir === 'string' ? dir : null;

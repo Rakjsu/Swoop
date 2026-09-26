@@ -32,7 +32,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.6.0"
+version = "0.7.0"
 edition = "2024"
 license = "MIT"
 rust-version = "1.93"
@@ -94,6 +94,9 @@ ts-rs = "12"
 async-speed-limit = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Cofre do sistema (Credential Manager, Keychain, keyutils). Sem as features de
+# plataforma o keyring guarda só em memória e perde o segredo em silêncio.
+keyring = { version = "3.6", features = ["windows-native", "apple-native", "linux-native"] }
 thiserror = "2"
 eyre = "0.6"
 clap = { version = "4", features = ["derive"] }

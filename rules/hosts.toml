@@ -78,3 +78,14 @@ image_captcha_selector = "img[src*='/captchas/']"
 digits_captcha_selector = "td[align=right] > div[style*='padding-left'], div.captcha_code"
 free_connections = 1
 free_resumable = false
+# Conta premium (aba Contas). Chave da API: "My Account" no site.
+api_direct_link = "/api/file/direct_link"
+api_account_info = "/api/account/info"
+account_scheme = "https"
+login_path = "/"
+logged_in_markers = ["op=logout"]
+bad_login_markers = ["incorrect login or password", "wrong login or password", "invalid login"]
+account_page = "/?op=my_account"
+premium_until_pattern = "(?i)premium(?:\\s+account)?\\s+expires?[^0-9]{0,40}(\\d{4}-\\d{2}-\\d{2}(?:\\s+\\d{2}:\\d{2}(?::\\d{2})?)?)"
+premium_connections = 5
+premium_resumable = true

@@ -11,6 +11,7 @@ mod file;
 pub mod knobs;
 pub mod stats;
 pub mod xfs;
+pub mod xfs_premium;
 
 pub use content::{effective_seed, fill, sha256_hex};
 pub use stats::Stats;
@@ -85,6 +86,11 @@ impl TestServer {
         self.shared.xfs.stats()
     }
 
+    /// Botões do arquivo que a conta premium do XFS falso recebe.
+    pub fn set_xfs_premium_file(&self, query: &str) {
+        self.shared.xfs.set_premium_file(query);
+    }
+
     /// Contadores atuais.
     pub fn stats(&self) -> Stats {
         self.shared.counters.snapshot()
@@ -119,6 +125,9 @@ fn router(shared: Shared) -> Router {
     Router::new()
         .route("/file/{name}", get(file::serve))
         .route("/{code}", get(xfs::page).post(xfs::form))
+        .route("/", get(xfs_premium::my_account).post(xfs_premium::login))
+        .route("/api/file/direct_link", get(xfs_premium::direct_link))
+        .route("/api/account/info", get(xfs_premium::account_info))
         .route("/stats", get(stats_json))
         .route("/admin/generation/{n}", post(set_generation))
         .route("/admin/reset", post(reset))

@@ -1,17 +1,22 @@
 //! Contrato de um plugin de servidor e o que ele recebe para trabalhar.
 
+use crate::accounts::Accounts;
 use crate::dump::Dump;
 use crate::rules::Rules;
 use async_trait::async_trait;
 use std::sync::Arc;
-use swoop_core::{ErrorClass, HostError, HttpFailure, ResolveRequest, Resolved, default_classify};
+use swoop_core::{
+    Account, AccountInfo, ErrorClass, HostError, HttpFailure, ResolveRequest, Resolved,
+    default_classify,
+};
 use swoop_net::reqwest;
 use url::Url;
 
 /// Níveis de subpasta abertos no máximo ao expandir uma pasta.
 pub const MAX_FOLDER_DEPTH: u32 = 5;
 
-/// O que um plugin usa: cliente de páginas (com cookies) e as regras.
+/// O que um plugin usa: cliente de páginas (com cookies), regras e as
+/// contas do usuário.
 #[derive(Clone)]
 pub struct HostCtx {
     pub http: reqwest::Client,
@@ -20,6 +25,8 @@ pub struct HostCtx {
     pub rules: Arc<Rules>,
     /// Gravação das respostas lidas (`--dump-fixtures`); `None` no uso normal.
     pub dump: Option<Arc<Dump>>,
+    /// Contas premium por servidor (vazio sem contas cadastradas).
+    pub accounts: Accounts,
 }
 
 impl HostCtx {
@@ -50,7 +57,6 @@ pub trait HostPlugin: Send + Sync {
     /// Nome e tamanho, conferindo que o arquivo está online.
     async fn check(&self, ctx: &HostCtx, url: &Url) -> Result<FileInfo, HostError>;
 
-    /// Link direto para o motor (`attempt` > 0 = link anterior expirou).
     /// Link direto para o motor. `req.attempt > 0` = o link anterior
     /// expirou; `req.captcha` traz a resposta do usuário a um captcha pedido.
     async fn resolve(&self, ctx: &HostCtx, req: &ResolveRequest) -> Result<Resolved, HostError>;
@@ -69,5 +75,25 @@ pub trait HostPlugin: Send + Sync {
     /// O que fazer com uma falha HTTP durante o download.
     fn classify(&self, failure: &HttpFailure) -> ErrorClass {
         default_classify(failure)
+    }
+
+    /// Esta chave de servidor aceita conta premium neste plugin?
+    fn accepts_account(&self, _host_key: &str, _rules: &Rules) -> bool {
+        false
+    }
+
+    /// Servidores com conta, para a interface oferecer (chaves de servidor).
+    fn account_hosts(&self, _rules: &Rules) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Confere a conta no site: premium, validade, tráfego.
+    async fn account_info(
+        &self,
+        _ctx: &HostCtx,
+        _host_key: &str,
+        _account: &Account,
+    ) -> Result<AccountInfo, HostError> {
+        Err(HostError::Unsupported)
     }
 }

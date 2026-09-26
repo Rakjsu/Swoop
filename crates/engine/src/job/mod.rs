@@ -165,9 +165,10 @@ async fn resolve(
             },
         ),
         HostError::Unsupported => TransferError::Fatal("link não suportado".into()),
-        e @ (HostError::BrowserRequired(_) | HostError::AccessDenied | HostError::PremiumOnly) => {
-            TransferError::Fatal(e.to_string())
-        }
+        e @ (HostError::BrowserRequired(_)
+        | HostError::AccessDenied
+        | HostError::PremiumOnly
+        | HostError::Account(_)) => TransferError::Fatal(e.to_string()),
         HostError::Captcha(challenge) => TransferError::Captcha(challenge),
     })
 }

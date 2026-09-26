@@ -1,4 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core';
+import type { AccountsView } from '../gen/AccountsView';
 import type { CollectorView } from '../gen/CollectorView';
 import type { Command } from '../gen/Command';
 import type { DownloadView } from '../gen/DownloadView';
@@ -24,6 +25,8 @@ export interface Transport {
   onPush(listener: (push: Push) => void): () => void;
   /** Mostra o arquivo no Explorer (só no desktop). */
   revealDownload?(id: number): Promise<void>;
+  /** Contas premium, sem segredo (só no desktop: o painel não mexe em contas). */
+  accounts?(): Promise<AccountsView>;
   /** Abre a janela do captcha de um download (só no desktop). */
   solveCaptcha?(id: number): Promise<void>;
   /** Janela "Escolher pasta" do sistema (só no desktop). */

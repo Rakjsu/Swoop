@@ -87,6 +87,23 @@ pub struct XfsRules {
     /// Download grátis: conexões e retomada.
     pub free_connections: u16,
     pub free_resumable: bool,
+    /// Conta premium: caminhos da API do site (com a chave).
+    pub api_direct_link: String,
+    pub api_account_info: String,
+    /// Esquema do site para conferir a conta (só a chave do servidor é
+    /// conhecida nessa hora).
+    pub account_scheme: String,
+    /// Login pelo formulário do site (`op=login`).
+    pub login_path: String,
+    /// Textos (minúsculas) da página depois do login: logado ou recusado.
+    pub logged_in_markers: Vec<String>,
+    pub bad_login_markers: Vec<String>,
+    /// Página da conta e o fim do premium escrito nela (grupo 1 = data).
+    pub account_page: String,
+    pub premium_until_pattern: String,
+    /// Download premium: conexões e retomada.
+    pub premium_connections: u16,
+    pub premium_resumable: bool,
 }
 
 /// Erro ao ler as regras.
