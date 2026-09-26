@@ -4,8 +4,12 @@
 //! O contador do site nunca é pulado: o formulário final só sai depois dele.
 //! O captcha nunca é resolvido aqui: vira `HostError::Captcha` e o usuário
 //! resolve na janela do app; a resposta volta em `ResolveRequest::captcha`.
+//! Com conta premium do usuário (aba Contas), o link vem da API ou da página
+//! com a sessão do login (`premium`), sem contador nem captcha.
 
+mod account;
 mod parse;
+mod premium;
 
 use crate::page::{self, Page};
 use crate::plugin::{FileInfo, HostCtx, HostPlugin};
@@ -14,7 +18,8 @@ use async_trait::async_trait;
 use parse::{Final, Step};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use swoop_core::{
-    CaptchaAnswer, CaptchaChallenge, HostError, RangeStyle, ResolveRequest, Resolved,
+    Account, AccountInfo, CaptchaAnswer, CaptchaChallenge, HostError, RangeStyle, ResolveRequest,
+    Resolved,
 };
 use swoop_net::reqwest::cookie::CookieStore;
 use url::Url;
@@ -39,8 +44,14 @@ async fn wait_until(until_ms: i64, rules: &XfsRules) {
 
 impl Xfs {
     /// Link direto pronto para o motor, com os cookies da sessão do site.
-    fn resolved(ctx: &HostCtx, link: Url, referer: &Url) -> Resolved {
+    /// Premium tem mais conexões e retomada (regras `premium_*`).
+    fn resolved(ctx: &HostCtx, link: Url, referer: &Url, premium: bool) -> Resolved {
         let rules = &ctx.rules.xfs;
+        let (connections, resumable) = if premium {
+            (rules.premium_connections, rules.premium_resumable)
+        } else {
+            (rules.free_connections, rules.free_resumable)
+        };
         let mut r = Resolved::direct(link.clone());
         r.headers.push(("Referer".into(), referer.to_string()));
         if let Some(cookie) = ctx
@@ -50,9 +61,9 @@ impl Xfs {
         {
             r.headers.push(("Cookie".into(), cookie));
         }
-        r.max_connections = rules.free_connections.max(1);
-        r.resumable = rules.free_resumable;
-        if !rules.free_resumable {
+        r.max_connections = connections.max(1);
+        r.resumable = resumable;
+        if !resumable {
             r.range = RangeStyle::None;
         }
         r.host_key = site_key(referer);
@@ -95,10 +106,10 @@ impl Xfs {
     ) -> Result<Option<Resolved>, HostError> {
         let res = page::post_form(ctx, action, fields).await?;
         if res.file {
-            return Ok(Some(Self::resolved(ctx, res.url, referer)));
+            return Ok(Some(Self::resolved(ctx, res.url, referer, false)));
         }
         match parse::final_page(&res.body, &res.url, &ctx.rules.xfs, SystemTime::now())? {
-            Final::Link(link) => Ok(Some(Self::resolved(ctx, link, referer))),
+            Final::Link(link) => Ok(Some(Self::resolved(ctx, link, referer, false))),
             Final::Again => Ok(None),
         }
     }
@@ -112,12 +123,18 @@ impl Xfs {
     }
 }
 
-/// Chave do servidor: o domínio sem `www.` (esperas valem por site).
+/// Chave do servidor: o domínio sem `www.` (e a porta, se o link tiver uma);
+/// esperas e contas valem por site.
 fn site_key(url: &Url) -> String {
-    url.host_str()
+    let host = url
+        .host_str()
         .unwrap_or("xfs")
         .trim_start_matches("www.")
-        .to_ascii_lowercase()
+        .to_ascii_lowercase();
+    match url.port() {
+        Some(port) => format!("{host}:{port}"),
+        None => host,
+    }
 }
 
 #[async_trait]
@@ -158,6 +175,11 @@ impl HostPlugin for Xfs {
     }
 
     async fn resolve(&self, ctx: &HostCtx, req: &ResolveRequest) -> Result<Resolved, HostError> {
+        if let Some(account) = ctx.accounts.get(&site_key(&req.url)) {
+            let code = parse::code(&req.url, &ctx.rules.xfs).ok_or(HostError::Unsupported)?;
+            let link = premium::link(ctx, &req.url, &code, &account).await?;
+            return Ok(Self::resolved(ctx, link, &req.url, true));
+        }
         if let Some(answer) = &req.captcha
             && let Some(resolved) = Self::answer(ctx, answer).await?
         {
@@ -165,7 +187,7 @@ impl HostPlugin for Xfs {
         }
         let (page, free) = Self::free_page(ctx, &req.url).await?;
         let Some(free) = free else {
-            return Ok(Self::resolved(ctx, page.url, &req.url));
+            return Ok(Self::resolved(ctx, page.url, &req.url, false));
         };
         let not_before_ms = now_ms() + free.countdown_secs as i64 * 1000;
         let action = free.form.target(&page.url);
@@ -187,5 +209,23 @@ impl HostPlugin for Xfs {
                     })
             }
         }
+    }
+
+    fn accepts_account(&self, host_key: &str, rules: &Rules) -> bool {
+        let host = host_key.rsplit_once(':').map_or(host_key, |(h, _)| h);
+        Rules::host_in(&rules.xfs.hosts, host)
+    }
+
+    fn account_hosts(&self, rules: &Rules) -> Vec<String> {
+        rules.xfs.hosts.clone()
+    }
+
+    async fn account_info(
+        &self,
+        ctx: &HostCtx,
+        host_key: &str,
+        account: &Account,
+    ) -> Result<AccountInfo, HostError> {
+        premium::info(ctx, host_key, account).await
     }
 }

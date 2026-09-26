@@ -5,7 +5,7 @@
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use swoop_api::Settings;
+use swoop_api::{Backend, Settings};
 use swoop_net::reqwest::{Client, StatusCode, header};
 use swoop_remote::{RemoteOptions, Running};
 use swoop_service::{Service, ServiceOptions};
@@ -151,6 +151,20 @@ async fn exec_e_arquivos_da_ui() {
     assert_eq!(bad.status(), StatusCode::BAD_REQUEST);
     let body: serde_json::Value = serde_json::from_slice(&bad.bytes().await.unwrap()).unwrap();
     assert_eq!(body["kind"], "invalid");
+
+    // Contas nunca passam pelo painel (senha e chave só no app).
+    let account = p
+        .http
+        .post(p.url("/api/v1/exec"))
+        .header(header::AUTHORIZATION, p.bearer())
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(r#"{"type":"add_account","host":"fastfile.cc","kind":"api_key","secret":"k"}"#)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(account.status(), StatusCode::FORBIDDEN);
+    let accounts = Backend::accounts(p.service.as_ref()).await.unwrap();
+    assert!(accounts.accounts.is_empty(), "nada foi cadastrado");
 
     let page = p.http.get(p.url("/")).send().await.unwrap();
     assert_eq!(page.status(), StatusCode::OK);

@@ -11,6 +11,7 @@ fn main() {
         "list",
         "history",
         "collector",
+        "accounts",
         "settings",
         "subscribe",
         "reveal_download",

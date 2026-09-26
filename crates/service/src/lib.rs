@@ -3,6 +3,7 @@
 //! pela trait `swoop_api::Backend` (em `backend.rs`), pelo app desktop e pelo
 //! painel remoto.
 
+mod accounts;
 mod backend;
 mod captcha;
 mod collector;
@@ -11,6 +12,7 @@ mod naming;
 mod notices;
 mod paths;
 mod prefs;
+mod vault;
 
 pub use collector::Collector;
 pub use paths::{data_dir_from_env, default_data_dir, default_download_dir};
@@ -49,6 +51,8 @@ pub enum ServiceError {
     BadSettings(String),
     #[error("{0}")]
     BadInput(String),
+    #[error(transparent)]
+    Vault(#[from] vault::VaultError),
 }
 
 /// Como abrir o serviço.
@@ -76,6 +80,8 @@ pub struct Service {
     /// Links colados esperando o "Iniciar" (e a verificação deles).
     collector: Collector,
     checker: JoinHandle<()>,
+    /// Cofre do sistema com as senhas/chaves das contas.
+    vault: Arc<dyn vault::Vault>,
     _lock: File,
 }
 
@@ -100,6 +106,8 @@ impl Service {
         let settings = prefs::load(&store, opts.settings).await?;
         let rules = Rules::for_data_dir(&data_dir);
         let hosts = Arc::new(Registry::new(rules).map_err(|e| ServiceError::Http(e.to_string()))?);
+        let vault = vault::default_vault();
+        accounts::load(&store, vault.as_ref(), &hosts.accounts()).await?;
         let engine = Engine::new(
             store.clone(),
             hosts.clone(),
@@ -128,6 +136,7 @@ impl Service {
             forward,
             collector,
             checker,
+            vault,
             _lock: lock,
         })
     }

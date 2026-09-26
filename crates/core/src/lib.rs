@@ -1,6 +1,7 @@
 //! Núcleo de domínio do Swoop: tipos e regras puras, sem rede, disco nem banco.
 //!
 //! - `state`: máquina de estados de um download (função pura `next`).
+//! - `account`: conta do usuário num servidor (segredo que não aparece em log).
 //! - `captcha`: desafio de captcha guardado até o usuário resolver.
 //! - `resolved`/`resolver`: o contrato entre plugins de servidor e o motor.
 //! - `error`: erros de servidor e a classificação de falhas HTTP.
@@ -9,6 +10,7 @@
 //! - `link`: estado de um link no coletor.
 //! - `settings`/`units`: preferências e conversão de tamanhos.
 
+pub mod account;
 pub mod captcha;
 pub mod error;
 pub mod filename;
@@ -21,6 +23,7 @@ pub mod settings;
 pub mod state;
 pub mod units;
 
+pub use account::{Account, AccountInfo, AccountKind, AccountStatus, Secret};
 pub use captcha::{CaptchaAnswer, CaptchaChallenge, CaptchaKind};
 pub use error::{ErrorClass, HostError, HttpFailure, WaitReason, default_classify};
 pub use ids::{DownloadId, PackageId};

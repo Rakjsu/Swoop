@@ -1,7 +1,9 @@
 //! A porta de entrada das interfaces. A janela Tauri e o painel web falam só
 //! com esta trait; quem a implementa (o `swoop-service`) liga banco e motor.
 
-use crate::{CollectorView, Command, DownloadView, HistoryView, Push, Reply, Snapshot};
+use crate::{
+    AccountsView, CollectorView, Command, DownloadView, HistoryView, Push, Reply, Snapshot,
+};
 use async_trait::async_trait;
 use serde::Serialize;
 use swoop_core::Settings;
@@ -71,6 +73,9 @@ pub trait Backend: Send + Sync {
 
     /// Preferências em uso (pastas já preenchidas com as do sistema).
     async fn settings(&self) -> Result<Settings, ApiError>;
+
+    /// Contas premium (sem segredo) e os servidores que aceitam conta.
+    async fn accounts(&self) -> Result<AccountsView, ApiError>;
 
     /// Passa a receber retratos e avisos.
     fn subscribe(&self) -> Subscription;

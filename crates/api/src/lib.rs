@@ -8,10 +8,12 @@
 //! Os tipos TypeScript saem daqui pelo `ts-rs` (`cargo test -p swoop-api`)
 //! para `ui/src/gen`; a UI nunca redeclara esses tipos à mão.
 
+mod accounts;
 mod backend;
 mod command;
 mod view;
 
+pub use accounts::{AccountView, AccountsView};
 pub use backend::{ApiError, Backend, Subscription};
 pub use command::{Command, Reply};
 pub use swoop_core::Settings;

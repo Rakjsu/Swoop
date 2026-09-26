@@ -4,7 +4,7 @@
 //! ficar simples do lado TypeScript.
 
 use serde::{Deserialize, Serialize};
-use swoop_core::Settings;
+use swoop_core::{AccountKind, Secret, Settings};
 use ts_rs::TS;
 
 /// Pedido da interface. No JSON: `{ "type": "pause", "id": 3 }`.
@@ -65,6 +65,32 @@ pub enum Command {
     CollectorRemoveOffline,
     /// Esvazia o coletor.
     CollectorClear,
+    /// Cadastra (ou troca) a conta do servidor. O segredo vai direto para o
+    /// cofre do sistema. Contas só no app do computador: o painel recusa.
+    AddAccount {
+        host: String,
+        kind: AccountKind,
+        #[serde(default)]
+        username: String,
+        secret: Secret,
+    },
+    RemoveAccount {
+        host: String,
+    },
+    /// Confere a conta no site (premium, validade).
+    CheckAccount {
+        host: String,
+    },
+}
+
+impl Command {
+    /// Mexe em conta (só o app do computador pode).
+    pub fn is_account(&self) -> bool {
+        matches!(
+            self,
+            Self::AddAccount { .. } | Self::RemoveAccount { .. } | Self::CheckAccount { .. }
+        )
+    }
 }
 
 /// Resposta a um `Command`.
@@ -122,6 +148,24 @@ mod tests {
                 delete_file: false
             }
         );
+    }
+
+    #[test]
+    fn conta_chega_com_segredo_que_nao_aparece_no_debug() {
+        let cmd: Command = serde_json::from_value(json!({
+            "type": "add_account", "host": "fastfile.cc", "kind": "api_key", "secret": "k-123"
+        }))
+        .unwrap();
+        assert!(cmd.is_account());
+        assert!(!format!("{cmd:?}").contains("k-123"));
+        let Command::AddAccount {
+            secret, username, ..
+        } = cmd
+        else {
+            panic!("esperava add_account");
+        };
+        assert_eq!((secret.expose(), username.as_str()), ("k-123", ""));
+        assert!(!Command::PauseAll.is_account());
     }
 
     #[test]

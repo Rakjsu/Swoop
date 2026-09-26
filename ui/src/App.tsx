@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { loadAppInfo, type AppInfo } from './appInfo';
+import { AccountsView } from './accounts/AccountsView';
 import { CollectorView } from './collector/CollectorView';
 import { DownloadsView } from './downloads/DownloadsView';
 import { HistoryView } from './history/HistoryView';
@@ -7,12 +8,14 @@ import { OptionsView } from './options/OptionsView';
 import { transport, type Transport } from './transport';
 import { UpdateBanner } from './update/UpdateBanner';
 
-type Tab = 'downloads' | 'collector' | 'history' | 'options';
+type Tab = 'downloads' | 'collector' | 'history' | 'accounts' | 'options';
 
+/** Abas deste ambiente: Contas só no app do computador. */
 const TABS: Array<[Tab, string]> = [
   ['downloads', 'Downloads'],
   ['collector', 'Coletor'],
   ['history', 'Histórico'],
+  ...(transport?.accounts ? [['accounts', 'Contas'] as [Tab, string]] : []),
   ['options', 'Opções'],
 ];
 
@@ -64,6 +67,8 @@ function Screen({ tab, transport, go }: { tab: Tab; transport: Transport; go: (t
       return <CollectorView transport={transport} onStarted={() => go('downloads')} />;
     case 'history':
       return <HistoryView transport={transport} />;
+    case 'accounts':
+      return <AccountsView transport={transport} />;
     case 'options':
       return <OptionsView transport={transport} />;
   }

@@ -48,7 +48,10 @@ async fn captcha_respeita_o_contador() {
     assert!(resolved.url.path().starts_with("/file/abcdefgh1234.bin"));
     assert_eq!(resolved.max_connections, 1);
     assert!(!resolved.resumable);
-    assert_eq!(resolved.host_key, "127.0.0.1");
+    assert_eq!(
+        resolved.host_key,
+        format!("127.0.0.1:{}", srv.addr().port())
+    );
     let stats = srv.xfs_stats();
     assert_eq!((stats.early_submits, stats.links), (0, 1));
 }

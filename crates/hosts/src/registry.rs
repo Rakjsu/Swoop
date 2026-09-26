@@ -1,6 +1,7 @@
 //! Registro dos plugins: escolhe o plugin pelo link, cai no link direto
 //! quando nenhum serve, e implementa o `Resolver` que o motor usa.
 
+use crate::accounts::Accounts;
 use crate::direct::{self, DirectResolver};
 use crate::dump::Dump;
 use crate::plugin::{FileInfo, HostCtx, HostPlugin};
@@ -10,7 +11,8 @@ use async_trait::async_trait;
 use std::path::PathBuf;
 use std::sync::Arc;
 use swoop_core::{
-    ErrorClass, HostError, HttpFailure, ResolveRequest, Resolved, Resolver, default_classify,
+    Account, AccountInfo, ErrorClass, HostError, HttpFailure, ResolveRequest, Resolved, Resolver,
+    default_classify,
 };
 use swoop_net::reqwest;
 use url::Url;
@@ -35,6 +37,7 @@ impl Registry {
                 jar,
                 rules: Arc::new(rules),
                 dump: None,
+                accounts: Accounts::default(),
             },
             plugins: vec![
                 Box::new(pixeldrain::Pixeldrain),
@@ -87,6 +90,41 @@ impl Registry {
         .map(String::as_str)
         .collect();
         detect::detect(text, &hosts)
+    }
+
+    /// Contas em uso (o serviço carrega e atualiza; os plugins leem).
+    pub fn accounts(&self) -> Accounts {
+        self.ctx.accounts.clone()
+    }
+
+    /// Servidores que aceitam conta premium.
+    pub fn account_hosts(&self) -> Vec<String> {
+        let rules = &self.ctx.rules;
+        self.plugins
+            .iter()
+            .flat_map(|p| p.account_hosts(rules))
+            .collect()
+    }
+
+    /// Algum plugin aceita conta para esta chave de servidor?
+    pub fn accepts_account(&self, host_key: &str) -> bool {
+        self.plugins
+            .iter()
+            .any(|p| p.accepts_account(host_key, &self.ctx.rules))
+    }
+
+    /// Confere a conta no site do servidor.
+    pub async fn account_info(
+        &self,
+        host_key: &str,
+        account: &Account,
+    ) -> Result<AccountInfo, HostError> {
+        let plugin = self
+            .plugins
+            .iter()
+            .find(|p| p.accepts_account(host_key, &self.ctx.rules))
+            .ok_or(HostError::Unsupported)?;
+        plugin.account_info(&self.ctx, host_key, account).await
     }
 
     /// Nome e tamanho, conferindo que está online.

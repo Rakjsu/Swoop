@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use swoop_api::{
-    ApiError, Backend, CaptchaInfo, CollectorView, Command, DownloadView, HistoryOutcome,
-    HistoryView, Reply, Subscription,
+    AccountsView, ApiError, Backend, CaptchaInfo, CollectorView, Command, DownloadView,
+    HistoryOutcome, HistoryView, Reply, Subscription,
 };
 use swoop_core::{CaptchaChallenge, DownloadId, Settings};
 use swoop_store::collector::CollectedRow;
@@ -54,6 +54,16 @@ impl Backend for Service {
             Command::CollectorRemove { ids } => self.collector.remove(Some(ids)).await?,
             Command::CollectorRemoveOffline => self.collector.remove(None).await?,
             Command::CollectorClear => self.collector.clear().await?,
+            Command::AddAccount {
+                host,
+                kind,
+                username,
+                secret,
+            } => self.add_account(&host, &username, kind, secret).await?,
+            Command::RemoveAccount { host } => self.remove_account(&host).await?,
+            Command::CheckAccount { host } => {
+                self.check_account(&host).await?;
+            }
         }
         Ok(Reply::Done)
     }
@@ -86,6 +96,14 @@ impl Backend for Service {
 
     async fn settings(&self) -> Result<Settings, ApiError> {
         Ok(Service::settings(self))
+    }
+
+    async fn accounts(&self) -> Result<AccountsView, ApiError> {
+        let rows = self.account_rows().await?;
+        Ok(AccountsView {
+            hosts: self.account_hosts(),
+            accounts: rows.into_iter().map(crate::accounts::view).collect(),
+        })
     }
 
     fn subscribe(&self) -> Subscription {

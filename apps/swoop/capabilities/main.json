@@ -11,6 +11,7 @@
     "allow-list",
     "allow-history",
     "allow-collector",
+    "allow-accounts",
     "allow-settings",
     "allow-subscribe",
     "allow-reveal-download",

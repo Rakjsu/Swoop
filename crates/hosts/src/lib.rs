@@ -11,6 +11,7 @@
 //! Nada aqui contorna espera, cota ou captcha: esses casos viram
 //! `HostError::Wait` ou `HostError::BrowserRequired` com mensagem clara.
 
+mod accounts;
 mod detect;
 mod direct;
 mod dump;
@@ -23,6 +24,7 @@ mod registry;
 pub mod rules;
 mod xfs;
 
+pub use accounts::Accounts;
 pub use direct::DirectResolver;
 pub use plugin::{FileInfo, HostCtx, HostPlugin};
 pub use registry::{DIRECT, Registry};

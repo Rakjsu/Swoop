@@ -6,8 +6,8 @@
 use crate::engine::EngineState;
 use std::path::PathBuf;
 use swoop_api::{
-    ApiError, AppInfo, Backend, CollectorView, Command, DownloadView, HistoryView, Push, Reply,
-    Settings,
+    AccountsView, ApiError, AppInfo, Backend, CollectorView, Command, DownloadView, HistoryView,
+    Push, Reply, Settings,
 };
 use swoop_core::DownloadId;
 use tauri::ipc::Channel;
@@ -44,6 +44,13 @@ pub async fn history(
 #[tauri::command]
 pub async fn collector(state: State<'_, EngineState>) -> Result<Vec<CollectorView>, ApiError> {
     Backend::collector(state.service()?.as_ref()).await
+}
+
+/// Contas premium, sem segredo (aba Contas). Cadastro e remoção vão por
+/// `exec` (o segredo segue direto para o cofre do sistema).
+#[tauri::command]
+pub async fn accounts(state: State<'_, EngineState>) -> Result<AccountsView, ApiError> {
+    Backend::accounts(state.service()?.as_ref()).await
 }
 
 /// Preferências em uso (tela de Opções).

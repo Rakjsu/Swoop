@@ -75,6 +75,7 @@ fn main() {
             commands::list,
             commands::history,
             commands::collector,
+            commands::accounts,
             commands::settings,
             commands::subscribe,
             commands::reveal_download,
