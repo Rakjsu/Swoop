@@ -46,7 +46,7 @@ impl Dump {
 }
 
 /// Só letras, números, `.`, `_` e `-` (até 40 caracteres).
-fn clean(s: &str) -> String {
+pub(crate) fn clean(s: &str) -> String {
     s.chars()
         .map(|c| {
             if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {

@@ -33,6 +33,9 @@ impl EngineState {
 pub fn open(app: &AppHandle) -> EngineState {
     let data_dir =
         swoop_service::data_dir_from_env().or_else(|| app.path().app_local_data_dir().ok());
+    if let Some(dir) = &data_dir {
+        crate::logs::attach(&dir.join("logs"));
+    }
     // Preferências salvas no banco (a tela de Opções grava lá).
     let opts = ServiceOptions {
         data_dir,
@@ -55,7 +58,14 @@ pub fn open(app: &AppHandle) -> EngineState {
 
 /// Para o motor esperando o checkpoint (no máximo `SHUTDOWN_TIMEOUT`). Um
 /// corte no meio não corrompe nada: o banco só afirma bytes já no disco.
+/// Bloqueia: é o caminho do `RunEvent::Exit`.
 pub fn shutdown(app: &AppHandle) {
+    tauri::async_runtime::block_on(stop(app));
+}
+
+/// O mesmo que `shutdown`, dentro de uma tarefa async (a atualização fecha o
+/// motor antes de abrir o instalador). Pode ser chamado mais de uma vez.
+pub async fn stop(app: &AppHandle) {
     let Some(state) = app.try_state::<EngineState>() else {
         return;
     };
@@ -65,8 +75,7 @@ pub fn shutdown(app: &AppHandle) {
     if let Some(live) = state.live.lock().expect("mutex").take() {
         live.abort();
     }
-    let done =
-        tauri::async_runtime::block_on(tokio::time::timeout(SHUTDOWN_TIMEOUT, service.shutdown()));
+    let done = tokio::time::timeout(SHUTDOWN_TIMEOUT, service.shutdown()).await;
     match done {
         Ok(()) => tracing::info!("progresso gravado; saindo"),
         Err(_) => tracing::warn!("o motor demorou para parar; saindo assim mesmo"),

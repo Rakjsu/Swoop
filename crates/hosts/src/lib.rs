@@ -13,6 +13,7 @@
 
 mod accounts;
 mod detect;
+mod diag;
 mod direct;
 mod dump;
 mod gdrive;

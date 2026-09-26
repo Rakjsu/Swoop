@@ -10,6 +10,17 @@ use tokio::io::AsyncWriteExt;
 /// Tamanho máximo aceito para o `SHA256SUMS.txt`.
 const MAX_SUMS: usize = 64 * 1024;
 
+/// Apaga a pasta dos instaladores baixados (os já usados e restos de
+/// download). O setup não se apaga sozinho; o app chama isto ao abrir.
+/// `Ok(false)` = não havia nada.
+pub fn cleanup(dir: &Path) -> std::io::Result<bool> {
+    match std::fs::remove_dir_all(dir) {
+        Ok(()) => Ok(true),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(e),
+    }
+}
+
 /// Baixa o instalador para `dir`, conferindo o hash publicado. Chama
 /// `progress(recebido, total)` a cada pedaço. Devolve o caminho final.
 pub async fn download(
@@ -98,4 +109,21 @@ async fn get_text(client: &swoop_net::reqwest::Client, url: &str) -> Result<Stri
         ));
     }
     String::from_utf8(body.to_vec()).map_err(|e| UpdateError::BadResponse(e.to_string()))
+}
+
+#[cfg(test)]
+mod cleanup_tests {
+    use super::cleanup;
+
+    #[test]
+    fn apaga_instaladores_e_tolera_pasta_ausente() {
+        let dir = tempfile::tempdir().unwrap();
+        let installers = dir.path().join("swoop-update");
+        std::fs::create_dir_all(&installers).unwrap();
+        std::fs::write(installers.join("Swoop_0.7.1_x64-setup.exe"), b"MZ").unwrap();
+        std::fs::write(installers.join("Swoop_0.7.2_x64-setup.exe.part"), b"M").unwrap();
+        assert!(cleanup(&installers).unwrap());
+        assert!(!installers.exists());
+        assert!(!cleanup(&installers).unwrap(), "nada para apagar");
+    }
 }

@@ -38,6 +38,7 @@ impl Registry {
                 rules: Arc::new(rules),
                 dump: None,
                 accounts: Accounts::default(),
+                diag: None,
             },
             plugins: vec![
                 Box::new(pixeldrain::Pixeldrain),
@@ -46,6 +47,12 @@ impl Registry {
                 Box::new(xfs::Xfs),
             ],
         })
+    }
+
+    /// Guarda em `dir` as páginas que os plugins não entenderem.
+    pub fn diagnostics_to(mut self, dir: PathBuf) -> Self {
+        self.ctx.diag = Some(Arc::new(crate::diag::Diagnostics::new(dir)));
+        self
     }
 
     /// Grava em `dir` cada resposta que os plugins lerem (fixtures).

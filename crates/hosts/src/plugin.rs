@@ -1,6 +1,7 @@
 //! Contrato de um plugin de servidor e o que ele recebe para trabalhar.
 
 use crate::accounts::Accounts;
+use crate::diag::Diagnostics;
 use crate::dump::Dump;
 use crate::rules::Rules;
 use async_trait::async_trait;
@@ -27,9 +28,25 @@ pub struct HostCtx {
     pub dump: Option<Arc<Dump>>,
     /// Contas premium por servidor (vazio sem contas cadastradas).
     pub accounts: Accounts,
+    /// Onde guardar a página que o plugin não entendeu; `None` = não guarda.
+    pub diag: Option<Arc<Diagnostics>>,
 }
 
 impl HostCtx {
+    /// Página que o plugin não entendeu (`HostError::Changed`): guarda para
+    /// diagnóstico e diz onde, na própria mensagem. Outros erros passam.
+    pub fn changed(&self, host: &str, step: &str, body: &str, e: HostError) -> HostError {
+        match (e, &self.diag) {
+            (HostError::Changed(m), Some(d)) => match d.save(host, step, body) {
+                Some(path) => {
+                    HostError::Changed(format!("{m} (página salva em {})", path.display()))
+                }
+                None => HostError::Changed(m),
+            },
+            (e, _) => e,
+        }
+    }
+
     /// Guarda a resposta lida, se a gravação estiver ligada.
     pub fn record(&self, url: &Url, status: u16, body: &str) {
         if let Some(d) = &self.dump {

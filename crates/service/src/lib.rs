@@ -33,6 +33,8 @@ use tokio::task::JoinHandle;
 const DB_FILE: &str = "swoop.sqlite";
 /// Trava de instância única dentro da pasta de dados.
 const LOCK_FILE: &str = "swoop.lock";
+/// Páginas que os plugins não entenderam (para o usuário mandar).
+const DIAG_DIR: &str = "diagnostico";
 
 /// Erro ao abrir ou operar o serviço (mensagens para o usuário).
 #[derive(Debug, thiserror::Error)]
@@ -105,7 +107,9 @@ impl Service {
         store.call(|c| swoop_store::collector::recover(c)).await?;
         let settings = prefs::load(&store, opts.settings).await?;
         let rules = Rules::for_data_dir(&data_dir);
-        let hosts = Arc::new(Registry::new(rules).map_err(|e| ServiceError::Http(e.to_string()))?);
+        let hosts = Registry::new(rules).map_err(|e| ServiceError::Http(e.to_string()))?;
+        // Páginas que um plugin não entender ficam aqui para diagnóstico.
+        let hosts = Arc::new(hosts.diagnostics_to(data_dir.join(DIAG_DIR)));
         let vault = vault::default_vault();
         accounts::load(&store, vault.as_ref(), &hosts.accounts()).await?;
         let engine = Engine::new(

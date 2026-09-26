@@ -13,6 +13,7 @@
 mod captcha;
 mod commands;
 mod engine;
+mod logs;
 mod notify;
 mod tray;
 mod update;
@@ -20,10 +21,15 @@ mod update;
 use tauri::{Manager, RunEvent, WindowEvent};
 use tracing_subscriber::EnvFilter;
 
-/// Liga os logs; o nível vem de `RUST_LOG` (padrão `info`).
+/// Liga os logs (console e, quando a pasta de dados abre, `logs/swoop.log`);
+/// o nível vem de `RUST_LOG` (padrão `info`).
 fn init_tracing() {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::fmt().with_env_filter(filter).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_ansi(false)
+        .with_writer(|| logs::Tee)
+        .init();
 }
 
 fn main() {
@@ -55,6 +61,7 @@ fn main() {
             app.manage(tray::TrayState {
                 available: has_tray,
             });
+            update::spawn_cleanup();
             update::spawn_checker(app.handle().clone());
             Ok(())
         })

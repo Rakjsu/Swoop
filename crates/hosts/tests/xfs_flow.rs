@@ -96,3 +96,51 @@ async fn sem_captcha_premium_e_espera_entre_downloads() {
         HostError::PremiumOnly
     );
 }
+
+/// Registro com espera padrão curta (o site do teste não mostra o contador).
+fn registry_hidden(extra: &str) -> Registry {
+    let rules = Rules::with_override(&format!(
+        "[xfs]\nhosts = [\"127.0.0.1\"]\nfallback_countdown_secs = 3\n{extra}"
+    ))
+    .unwrap();
+    Registry::new(rules).unwrap()
+}
+
+#[tokio::test]
+async fn contador_escondido_espera_o_padrao_e_link_vem_por_pagina() {
+    let srv = TestServer::start().await.unwrap();
+    let reg = registry_hidden("");
+    for (i, fin) in ["meta", "script"].into_iter().enumerate() {
+        let code = format!("abcdefgh123{i}");
+        let q = format!("countdown=2&countdown_hidden=1&captcha=none&final={fin}&size=4096");
+        let t0 = Instant::now();
+        let r = reg.resolve(&req(&srv.xfs_url(&code, &q))).await.expect(fin);
+        assert!(t0.elapsed() >= Duration::from_secs(3), "{fin}: não esperou");
+        assert!(
+            r.url.path().starts_with(&format!("/file/{code}.bin")),
+            "{fin}"
+        );
+    }
+    assert_eq!(srv.xfs_stats().early_submits, 0, "contador pulado");
+}
+
+#[tokio::test]
+async fn pagina_nao_entendida_fica_salva_para_diagnostico() {
+    let srv = TestServer::start().await.unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let reg = registry_hidden("").diagnostics_to(dir.path().join("diagnostico"));
+    let q = "countdown=0&captcha=none&final=blank&size=4096";
+    let err = reg.resolve(&req(&srv.xfs_url(CODE, q))).await.unwrap_err();
+    let HostError::Changed(msg) = err else {
+        panic!("esperava Changed, veio {err:?}");
+    };
+    assert!(msg.contains("página salva em"), "{msg}");
+    let saved: Vec<_> = std::fs::read_dir(dir.path().join("diagnostico"))
+        .unwrap()
+        .flatten()
+        .collect();
+    assert_eq!(saved.len(), 1);
+    let body = std::fs::read_to_string(saved[0].path()).unwrap();
+    assert!(body.contains("Obrigado por baixar"));
+    assert!(saved[0].file_name().to_string_lossy().contains("-final-"));
+}

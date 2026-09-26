@@ -78,7 +78,7 @@ fn download_gratis_com_recaptcha_e_contador() {
     else {
         panic!("esperava a página do download grátis");
     };
-    assert_eq!(free.countdown_secs, 30);
+    assert_eq!((free.countdown_secs, free.countdown_found), (30, true));
     assert!(
         free.form
             .fields
@@ -118,7 +118,8 @@ fn captcha_de_imagem_e_de_digitos() {
     else {
         panic!("ddownload");
     };
-    assert_eq!(free.countdown_secs, 0);
+    // sem contador na página: vale a espera padrão das regras, nunca 0
+    assert_eq!((free.countdown_secs, free.countdown_found), (60, false));
     let (kind, _) = free.captcha.unwrap();
     // o scraper reescreve `&#55;` como "7"
     assert!(
