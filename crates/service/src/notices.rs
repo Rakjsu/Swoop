@@ -54,6 +54,11 @@ pub async fn forward(
                     let name = display_name(&store, id).await;
                     let _ = tx.send(Push::Notice(Notice::Failed { name, message }));
                 }
+                EngineEvent::CaptchaNeeded(id) => {
+                    let name = display_name(&store, id).await;
+                    let host = host_of(&store, id).await;
+                    let _ = tx.send(Push::Notice(Notice::CaptchaNeeded { name, host }));
+                }
                 _ => {}
             }
         }
@@ -76,6 +81,17 @@ async fn queue_idle(store: &Store) -> bool {
             false
         }
     }
+}
+
+/// Domínio do link (para o aviso de captcha).
+async fn host_of(store: &Store, id: DownloadId) -> String {
+    let row = store
+        .call(move |c| downloads::get(c, id))
+        .await
+        .ok()
+        .flatten();
+    row.and_then(|r| Url::parse(&r.url).ok()?.host_str().map(str::to_owned))
+        .unwrap_or_default()
 }
 
 /// Nome do arquivo para o aviso (sem o link inteiro, que pode ter chave).

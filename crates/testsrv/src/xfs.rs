@@ -80,11 +80,13 @@ fn file_name(code: &str, k: &XfsKnobs) -> String {
     k.name.clone().unwrap_or_else(|| format!("{code}.bin"))
 }
 
-/// Página do arquivo.
+/// Página do arquivo (com um script "do site", que a janela de captcha não
+/// pode deixar rodar).
 pub async fn page(Path(code): Path<String>, Query(k): Query<XfsKnobs>) -> Html<String> {
     let name = file_name(&code, &k);
     Html(format!(
-        "<html><body><h2>{name}</h2><span>({} KB)</span>\
+        "<html><head><script>window.siteRan = true; document.title = 'script do site';</script>\
+         </head><body><h2>{name}</h2><span>({} KB)</span>\
          <form method=\"POST\" action=\"\">\
          <input type=\"hidden\" name=\"op\" value=\"download1\">\
          <input type=\"hidden\" name=\"id\" value=\"{code}\">\

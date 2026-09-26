@@ -203,6 +203,15 @@
   color: var(--accent);
 }
 
+.btn-solve {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.dl-captcha_needed .dl-status {
+  color: var(--accent);
+}
+
 .dl-actions {
   display: flex;
   justify-content: flex-end;

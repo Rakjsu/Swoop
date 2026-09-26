@@ -4239,7 +4239,7 @@ dependencies = [
 
 [[package]]
 name = "swoop"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4262,7 +4262,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-api"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -4275,7 +4275,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-cli"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "clap",
  "eyre",
@@ -4298,7 +4298,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-core"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "percent-encoding",
@@ -4311,7 +4311,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-engine"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-speed-limit",
  "async-trait",
@@ -4341,7 +4341,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-hosts"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -4362,7 +4362,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-installer"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "serde",
  "tauri",
@@ -4373,7 +4373,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-net"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "httpdate",
  "percent-encoding",
@@ -4384,7 +4384,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-remote"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "axum",
  "futures-util",
@@ -4407,7 +4407,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-service"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "dirs 7.0.0",
@@ -4428,7 +4428,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-store"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "rusqlite",
  "swoop-core",
@@ -4439,7 +4439,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-testsrv"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "axum",
  "bytes",
@@ -4455,7 +4455,7 @@ dependencies = [
 
 [[package]]
 name = "swoop-update"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "futures-util",
  "hex",

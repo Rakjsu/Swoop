@@ -14,6 +14,7 @@ fn main() {
         "settings",
         "subscribe",
         "reveal_download",
+        "solve_captcha",
         "update_status",
         "install_update",
     ]);

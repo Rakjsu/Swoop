@@ -26,6 +26,10 @@ fases com portões está em `docs/specs/2026-09-25-swoop-design.md`: ler antes d
   - conferir/resolver sem banco: `cargo run -p swoop-cli -- check <links ou texto>` · `resolve <link> --dump-fixtures <pasta>` (grava só corpos, nunca cabeçalhos; revisar antes de commitar como fixture)
   - portão (d), link expirando: `cargo test -p swoop-engine --test reresolve -- --nocapture`
   - rede (links públicos; trocáveis por `SWOOP_TEST_*`): `cargo test -p swoop-hosts --test network -- --ignored --test-threads=1 --nocapture` e `cargo test -p swoop-engine --test network -- --ignored --test-threads=1 --nocapture`. Na nuvem o proxy bloqueia os sites até o dono liberar os domínios.
+- **Captcha e XFileSharing (fase 4a):**
+  - portão (b), serviço inteiro contra o XFS falso do testsrv: `cargo test -p swoop-service --test captcha_xfs -- --nocapture` (motor: `cargo test -p swoop-engine --test captcha`; plugin: `cargo test -p swoop-hosts --test xfs_flow`)
+  - página da janela (`apps/swoop/src/captcha/page.js`) no Chromium: `npx playwright test e2e/captcha-page.spec.ts` (em `ui/`); navegação e capabilities: `cargo test -p swoop captcha`
+  - XFS falso à mão: `http://127.0.0.1:P/<código de 12>?countdown=2&captcha=recaptcha|image|none&wait_between=5&premium_only=1`; para o Swoop tratá-lo como XFS, `<dados>/rules/hosts.toml` com `[xfs]` e `hosts = ["127.0.0.1"]`
 - **Checagem para Windows sem Windows:** `rustup target add x86_64-pc-windows-gnu`, `apt install gcc-mingw-w64-x86-64`, depois `cargo clippy --target x86_64-pc-windows-gnu --all-targets -- -D warnings`
 - **Linux sem display (nuvem):** `xvfb-run -a ./target/release/swoop`. Print com `import -window root x.png`.
 
@@ -44,7 +48,7 @@ fases com portões está em `docs/specs/2026-09-25-swoop-design.md`: ler antes d
 - Toda fase termina num portão medido: número ou comparação objetiva, não "funciona".
 - Dados simulados só em testes. Não existe modo demo: a UI em dev fala com o motor real.
 - **Comando Tauri novo** entra em três lugares: `generate_handler!` (`src/main.rs`), `AppManifest::commands` (`build.rs`) e `capabilities/main.json` (`allow-<nome>`).
-- **Janelas de captcha (fase 4)** nunca recebem capability. Página de servidor não fala com o Rust.
+- **Janelas de captcha** (`captcha-<id>`, `apps/swoop/src/captcha/`) nunca recebem capability: página de servidor não fala com o Rust (teste `janela_de_captcha_fora_das_capabilities`). Navegação passa por `route()` (só o site e os provedores de captcha; a resposta volta por `https://swoop-captcha.invalid/done?id=&token=`); popups e downloads negados. O X delas fecha de verdade (o `on_window_event` só esconde a `main`).
 - **TLS:** rustls com **ring**. `aws-lc-sys` na árvore exige NASM no Windows, e o CI falha se ele aparecer.
 - **Commits:** mensagens em português, no estilo `feat: ...`/`fix: ...`, sem `Co-Authored-By`.
 
@@ -72,6 +76,10 @@ fases com portões está em `docs/specs/2026-09-25-swoop-design.md`: ler antes d
 - **`HostError::BrowserRequired`:** a mensagem é mostrada como está, então diz o servidor e o que fazer ("o Mediafire pediu captcha; abra o link no navegador").
 - **Coletor (`crates/service/src/collector.rs` + `crates/store/src/collector.rs`):** URL única (colar de novo não duplica); `batch` = uma colagem (vira um pacote no "iniciar sozinho"); verificação em levas de até 4, uma por servidor (`host_key` = plugin ou domínio); `checking` volta para `unchecked` ao reabrir. A janela usa `Command::Collect`; `AddLinks` direto fica para CLI/API.
 - **Lista de Downloads com pacotes:** cabeçalho e linhas têm a mesma altura (`ROW_HEIGHT`), achatados por `buildItems` — a lista virtual continua simples. Recolhidos ficam no `localStorage` (try/catch).
+- **Página do captcha (`page.js`):** não usar `window.stop()` nem `document.open()` no script de inicialização — o Chromium (WebView2) deixa de pintar a janela. Os scripts do site são desligados por um `MutationObserver` (o parser só executa script conectado) e a página é trocada no `DOMContentLoaded`. O marcador `SWOOP_CFG` aparece uma vez só (o Rust troca pelo JSON).
+- **Captcha no fluxo:** plugin devolve `HostError::Captcha(desafio)` → `downloads.captcha` (JSON) + estado `captcha_needed`, que não ocupa vaga; `Service::captcha_solved` grava o token e volta para a fila; a próxima resolução leva a resposta em `ResolveRequest::captcha` (vale uma vez: `take_answer` apaga). O token nunca vai para log (`Debug` do `CaptchaAnswer` esconde). Tokens vencem em ~2 min: a janela só mostra o widget 90 s antes do fim do contador.
+- **Espera do servidor (`host_state`):** `Wait{HostLimit}` do plugin grava `host_state(host_key)`; o agendador pula links daquele servidor até `wait_until`, e isso sobrevive a reabrir. A chave do XFS é o domínio sem `www.`.
+- **XFileSharing (`crates/hosts/src/xfs/`):** o contador nunca é pulado (o plugin dorme até `not_before_ms` antes do `download2`); grátis = 1 conexão sem retomada (regras `free_*`). Sites novos entram em `[xfs] hosts` das regras. Fixtures em `tests/fixtures/xfs/` são reconstruídas (a nuvem não alcança os sites): trocar por capturas reais quando der.
 - **Pasta do Drive:** a página `embeddedfolderview` é lida por todos os `<a href>` (como o gdown), sem depender de classe; Docs/Planilhas nativos são ignorados.
 
 ## Nunca

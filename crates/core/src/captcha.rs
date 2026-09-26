@@ -52,10 +52,20 @@ impl CaptchaChallenge {
 }
 
 /// Resposta do usuário a um desafio.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct CaptchaAnswer {
     pub challenge: CaptchaChallenge,
     pub token: String,
+}
+
+/// Sem o token: um `{:?}` num log não pode vazar a resposta.
+impl std::fmt::Debug for CaptchaAnswer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CaptchaAnswer")
+            .field("challenge", &self.challenge)
+            .field("token", &"<oculto>")
+            .finish()
+    }
 }
 
 #[cfg(test)]
@@ -78,5 +88,11 @@ mod tests {
         assert!(json.contains("\"type\":\"recaptcha2\""));
         assert_eq!(serde_json::from_str::<CaptchaChallenge>(&json).unwrap(), c);
         assert_eq!(c.host(), "fastfile.cc");
+
+        let answer = CaptchaAnswer {
+            challenge: c,
+            token: "03AF-segredo".into(),
+        };
+        assert!(!format!("{answer:?}").contains("segredo"));
     }
 }

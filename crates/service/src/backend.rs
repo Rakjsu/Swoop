@@ -7,10 +7,10 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use swoop_api::{
-    ApiError, Backend, CollectorView, Command, DownloadView, HistoryOutcome, HistoryView, Reply,
-    Subscription,
+    ApiError, Backend, CaptchaInfo, CollectorView, Command, DownloadView, HistoryOutcome,
+    HistoryView, Reply, Subscription,
 };
-use swoop_core::{DownloadId, Settings};
+use swoop_core::{CaptchaChallenge, DownloadId, Settings};
 use swoop_store::collector::CollectedRow;
 use swoop_store::history::HistoryRow;
 use swoop_store::{DownloadRow, StoreError, downloads, packages};
@@ -112,7 +112,16 @@ impl Service {
 
 /// Linha do banco → linha da interface.
 fn view(r: DownloadRow, package_name: String) -> DownloadView {
+    let captcha = r
+        .captcha
+        .as_deref()
+        .and_then(|json| serde_json::from_str::<CaptchaChallenge>(json).ok())
+        .map(|c| CaptchaInfo {
+            host: c.host().to_owned(),
+            not_before_ms: c.not_before_ms,
+        });
     DownloadView {
+        captcha,
         id: r.id.0,
         package_id: r.package_id.0,
         package_name,
@@ -168,7 +177,7 @@ fn store(e: StoreError) -> ApiError {
 impl From<ServiceError> for ApiError {
     fn from(e: ServiceError) -> Self {
         match e {
-            ServiceError::BadLink(_) | ServiceError::BadSettings(_) => {
+            ServiceError::BadLink(_) | ServiceError::BadSettings(_) | ServiceError::BadInput(_) => {
                 ApiError::Invalid(e.to_string())
             }
             ServiceError::Store(StoreError::NotFound(id)) => {
