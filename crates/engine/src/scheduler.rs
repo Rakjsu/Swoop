@@ -52,8 +52,7 @@ async fn fill(inner: &Arc<Inner>) -> Result<(), swoop_store::StoreError> {
     if woken > 0 {
         let _ = inner.events_tx.send(EngineEvent::Changed);
     }
-    let settings = inner.settings.lock().expect("mutex").clone();
-    if free_slots(inner, &settings) == 0 {
+    if free_slots(inner) == 0 {
         return Ok(());
     }
     let (waiting, pending, answered) = inner
@@ -73,13 +72,13 @@ async fn fill(inner: &Arc<Inner>) -> Result<(), swoop_store::StoreError> {
     // esperar outro download terminar.
     let reserved = pending.iter().filter(|r| live_deadline(r)).count();
     for row in answered {
-        if free_slots(inner, &settings) == 0 {
+        if free_slots(inner) == 0 {
             return Ok(());
         }
-        try_start(inner, &settings, &gate, row).await;
+        try_start(inner, &gate, row).await;
     }
     let mut after = i64::MIN;
-    while free_slots(inner, &settings) > reserved && !inner.shutdown.is_cancelled() {
+    while free_slots(inner) > reserved && !inner.shutdown.is_cancelled() {
         let page = inner
             .store
             .call(move |c| downloads::queued_after(c, after, QUEUE_PEEK))
@@ -89,10 +88,10 @@ async fn fill(inner: &Arc<Inner>) -> Result<(), swoop_store::StoreError> {
         };
         after = last.position;
         for row in page {
-            if free_slots(inner, &settings) <= reserved || inner.shutdown.is_cancelled() {
+            if free_slots(inner) <= reserved || inner.shutdown.is_cancelled() {
                 break;
             }
-            try_start(inner, &settings, &gate, row).await;
+            try_start(inner, &gate, row).await;
         }
     }
     Ok(())
@@ -105,7 +104,10 @@ struct Gate {
 }
 
 /// Inicia `row` se o servidor deixar (espera, vaga do servidor, conexões).
-async fn try_start(inner: &Arc<Inner>, settings: &Settings, gate: &Gate, row: DownloadRow) {
+/// As preferências são lidas aqui, e não no começo da rodada: uma troca feita
+/// enquanto o agendador lia o banco já vale para este início.
+async fn try_start(inner: &Arc<Inner>, gate: &Gate, row: DownloadRow) {
+    let settings = &current_settings(inner);
     let host = row.server();
     let policy = inner.resolver.host_policy(&host);
     if !policy.ignore_host_waits
@@ -157,10 +159,16 @@ fn active_on(inner: &Inner, host: &str) -> usize {
     active.values().filter(|a| a.host == host).count()
 }
 
-/// Vagas de download livres.
-fn free_slots(inner: &Inner, settings: &Settings) -> usize {
+/// Preferências atuais do motor.
+fn current_settings(inner: &Inner) -> Settings {
+    inner.settings.lock().expect("mutex").clone()
+}
+
+/// Vagas de download livres, pelo limite atual.
+fn free_slots(inner: &Inner) -> usize {
+    let max = inner.settings.lock().expect("mutex").max_active_downloads;
     let active = inner.active.lock().expect("mutex").len();
-    settings.max_active_downloads.saturating_sub(active)
+    max.saturating_sub(active)
 }
 
 /// Conexões que o download pode abrir sem estourar o limite do servidor
