@@ -11,13 +11,15 @@ pub mod content;
 mod file;
 pub mod knobs;
 pub mod rapidgator;
+pub mod rapidgator_api;
 mod rapidgator_captcha;
+pub mod rapidgator_folder;
 mod rapidgator_pages;
 pub mod stats;
 pub mod xfs;
 pub mod xfs_premium;
 
-pub use content::{effective_seed, fill, sha256_hex};
+pub use content::{effective_seed, fill, md5_hex, sha256_hex};
 pub use rapidgator::RgStats;
 pub use stats::Stats;
 pub use xfs::XfsStats;
@@ -93,6 +95,11 @@ impl TestServer {
     /// O que o Rapidgator falso viu.
     pub fn rapidgator_stats(&self) -> RgStats {
         self.shared.rg.stats()
+    }
+
+    /// Estado do Rapidgator falso (arquivo premium, sessões, tráfego).
+    pub fn rapidgator(&self) -> &rapidgator::RgState {
+        &self.shared.rg
     }
 
     /// Endereço real (porta escolhida pelo SO).
@@ -176,6 +183,15 @@ fn rg_router(shared: Shared) -> Router {
             get(rapidgator_captcha::captcha_page).post(rapidgator_captcha::captcha_submit),
         )
         .route("/dl/{token}/{name}", get(rapidgator_captcha::download))
+        .route("/api/v2/user/login", post(rapidgator_api::login))
+        .route("/api/v2/user/info", get(rapidgator_api::user_info))
+        .route("/api/v2/file/info", get(rapidgator_api::file_info))
+        .route("/api/v2/file/download", get(rapidgator_api::file_download))
+        .route(
+            "/premium/{id}/{name}",
+            get(rapidgator_api::premium_download),
+        )
+        .route("/folder/{n}/{name}", get(rapidgator_folder::folder))
         .with_state(shared)
 }
 

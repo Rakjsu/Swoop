@@ -4,7 +4,7 @@
 
 use crate::vault::Vault;
 use crate::{Service, ServiceError};
-use swoop_api::{AccountView, Push};
+use swoop_api::{AccountHost, AccountView, Push};
 use swoop_core::{Account, AccountInfo, AccountKind, AccountStatus, HostError, Secret};
 use swoop_hosts::{Accounts, Registry};
 use swoop_store::accounts::{self, AccountRow};
@@ -87,6 +87,11 @@ impl Service {
                 "o Swoop não usa conta em \"{host}\""
             )));
         }
+        if !self.hosts.account_kinds(&host).contains(&kind) {
+            return Err(ServiceError::BadInput(format!(
+                "o {host} só aceita conta com usuário (ou e-mail) e senha"
+            )));
+        }
         if secret.is_blank() {
             return Err(ServiceError::BadInput("informe a senha ou a chave".into()));
         }
@@ -156,9 +161,16 @@ impl Service {
         Ok(self.store.call(|c| accounts::list(c)).await?)
     }
 
-    /// Servidores que aceitam conta.
-    pub fn account_hosts(&self) -> Vec<String> {
-        self.hosts.account_hosts()
+    /// Servidores que aceitam conta, com os tipos de conta de cada um.
+    pub fn account_hosts(&self) -> Vec<AccountHost> {
+        self.hosts
+            .account_hosts()
+            .into_iter()
+            .map(|host| AccountHost {
+                kinds: self.hosts.account_kinds(&host),
+                host,
+            })
+            .collect()
     }
 }
 
@@ -193,3 +205,7 @@ async fn check(
 #[cfg(test)]
 #[path = "accounts_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "accounts_rg_tests.rs"]
+mod rg_tests;

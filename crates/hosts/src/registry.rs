@@ -11,8 +11,8 @@ use async_trait::async_trait;
 use std::path::PathBuf;
 use std::sync::Arc;
 use swoop_core::{
-    Account, AccountInfo, ErrorClass, HostError, HostPolicy, HttpFailure, ResolveRequest, Resolved,
-    Resolver, default_classify,
+    Account, AccountInfo, AccountKind, ErrorClass, HostError, HostPolicy, HttpFailure,
+    ResolveRequest, Resolved, Resolver, default_classify,
 };
 use swoop_net::reqwest;
 use url::Url;
@@ -120,6 +120,15 @@ impl Registry {
             .iter()
             .flat_map(|p| p.account_hosts(rules))
             .collect()
+    }
+
+    /// Tipos de conta aceitos no servidor (vazio = não aceita conta).
+    pub fn account_kinds(&self, host_key: &str) -> Vec<AccountKind> {
+        self.plugins
+            .iter()
+            .find(|p| p.accepts_account(host_key, &self.ctx.rules))
+            .map(|p| p.account_kinds())
+            .unwrap_or_default()
     }
 
     /// Algum plugin aceita conta para esta chave de servidor?

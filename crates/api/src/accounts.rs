@@ -25,10 +25,18 @@ pub struct AccountView {
     pub error: Option<String>,
 }
 
+/// Servidor que aceita conta e os tipos de conta que ele usa.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+pub struct AccountHost {
+    pub host: String,
+    pub kinds: Vec<AccountKind>,
+}
+
 /// Aba Contas: servidores que aceitam conta e as contas cadastradas.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 #[ts(export)]
 pub struct AccountsView {
-    pub hosts: Vec<String>,
+    pub hosts: Vec<AccountHost>,
     pub accounts: Vec<AccountView>,
 }

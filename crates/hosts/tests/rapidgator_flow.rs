@@ -248,3 +248,33 @@ async fn coletor_le_nome_e_tamanho() {
         "conferir não começa download"
     );
 }
+
+#[tokio::test]
+async fn pasta_com_paginas_e_subpasta_vira_os_arquivos() {
+    let srv = TestServer::start().await.unwrap();
+    let reg = registry(&srv, "folder_page_delay_ms = 10\n");
+    let folder = |q: &str| {
+        Url::parse(&format!(
+            "{}/folder/1/Colecao.html?{q}",
+            srv.rapidgator_origin()
+        ))
+        .unwrap()
+    };
+    let files = reg
+        .expand(&folder("files=5&per_page=2&sub=1"))
+        .await
+        .unwrap()
+        .expect("é pasta");
+    // 5 arquivos em 3 páginas + 2 da subpasta, sem repetir
+    assert_eq!(files.len(), 7, "{files:?}");
+    assert!(files.iter().all(|u| reg.host_of(u) == "rapidgator"));
+    assert_eq!(srv.rapidgator_stats().folder_pages, 4);
+    assert_eq!(reg.expand(&folder("files=0")).await.unwrap(), Some(vec![]));
+    assert_eq!(
+        reg.expand(&folder("missing=1")).await.unwrap_err(),
+        HostError::Offline
+    );
+    // link de arquivo não é pasta
+    let file = Url::parse(&srv.rapidgator_url(ID, "a.zip", "")).unwrap();
+    assert_eq!(reg.expand(&file).await.unwrap(), None);
+}

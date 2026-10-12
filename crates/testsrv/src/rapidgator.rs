@@ -85,6 +85,13 @@ pub struct RgStats {
     pub final_link_gets: u64,
     pub final_link_rejected: u64,
     pub links: u64,
+    /// API premium: logins (POST), logins com a senha na URL (nunca deve
+    /// haver), links premium entregues.
+    pub logins: u64,
+    pub password_in_query: u64,
+    pub premium_links: u64,
+    /// Páginas de pasta lidas.
+    pub folder_pages: u64,
 }
 
 /// Um fluxo grátis (por `sid` do contador).
@@ -109,6 +116,11 @@ pub(crate) struct Inner {
     pub(crate) last_download: Option<Instant>,
     pub(crate) next: u64,
     pub(crate) stats: RgStats,
+    /// API premium: tokens válidos → conta premium?
+    pub(crate) api_tokens: HashMap<String, bool>,
+    /// Arquivo que a conta premium baixa: (tamanho, semente, taxa).
+    pub(crate) premium_file: Option<(u64, u64, Option<u64>)>,
+    pub(crate) traffic_exceeded: bool,
 }
 
 /// Estado do Rapidgator falso.
@@ -118,6 +130,21 @@ pub struct RgState(pub(crate) Arc<Mutex<Inner>>);
 impl RgState {
     pub fn stats(&self) -> RgStats {
         self.0.lock().unwrap().stats.clone()
+    }
+
+    /// Arquivo que a conta premium recebe (tamanho, semente, bytes/s por conexão).
+    pub fn set_premium_file(&self, size: u64, seed: u64, rate: Option<u64>) {
+        self.0.lock().unwrap().premium_file = Some((size, seed, rate));
+    }
+
+    /// Derruba todas as sessões da API (a próxima chamada recebe 401).
+    pub fn expire_sessions(&self) {
+        self.0.lock().unwrap().api_tokens.clear();
+    }
+
+    /// Tráfego premium esgotado (423).
+    pub fn set_traffic_exceeded(&self, exceeded: bool) {
+        self.0.lock().unwrap().traffic_exceeded = exceeded;
     }
 }
 

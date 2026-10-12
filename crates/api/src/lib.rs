@@ -13,7 +13,7 @@ mod backend;
 mod command;
 mod view;
 
-pub use accounts::{AccountView, AccountsView};
+pub use accounts::{AccountHost, AccountView, AccountsView};
 pub use backend::{ApiError, Backend, Subscription};
 pub use command::{Command, Reply};
 pub use swoop_core::Settings;

@@ -186,8 +186,13 @@ api_user_info = "user/info"
 api_file_info = "file/info"
 api_file_download = "file/download"
 session_minutes = 45
+# Textos (minúsculas) do campo `details` da API.
 api_wait_markers = ["please wait"]
 api_wait_minutes = 5
+api_bad_login_markers = ["wrong e-mail or password", "error e-mail or password", "login or password is wrong", "password cannot be blank", "parameter login or password is missing"]
+api_unusual_ip_markers = ["unusual ip"]
+api_2fa_markers = ["auth code", "two-factor", "2fa"]
+api_locked_markers = ["frozen", "locked"]
 traffic_wait_minutes = 60
 # `file.mode_label` de arquivo pago/só de assinantes (minúsculas) [S].
 paid_markers = ["paid", "subscri"]

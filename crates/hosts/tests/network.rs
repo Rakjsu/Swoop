@@ -154,3 +154,28 @@ async fn drive_pasta() {
     println!("drive: pasta com {} arquivo(s)", files.len());
     assert!(!files.is_empty());
 }
+
+/// Rapidgator: só `check` e link removido (nunca `resolve`, que começaria um
+/// download grátis de verdade). Sem `SWOOP_TEST_RAPIDGATOR` o teste só
+/// confere o link removido.
+#[tokio::test]
+#[ignore = "rede"]
+async fn rapidgator_check_e_removido() {
+    let reg = registry();
+    if let Ok(link) = std::env::var("SWOOP_TEST_RAPIDGATOR")
+        && !link.trim().is_empty()
+    {
+        let info = reg
+            .check(&Url::parse(link.trim()).unwrap())
+            .await
+            .expect("check do Rapidgator");
+        println!("rapidgator: {info:?}");
+        assert!(info.name.is_some(), "nome não lido da página");
+        assert!(info.size.unwrap_or(0) > 0, "tamanho não lido da página");
+    }
+    assert_offline_fast(
+        &reg,
+        "https://rapidgator.net/file/ffffffffffffffffffffffffffffffff/nada.zip.html",
+    )
+    .await;
+}

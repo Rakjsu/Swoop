@@ -7,8 +7,8 @@ use crate::rules::Rules;
 use async_trait::async_trait;
 use std::sync::Arc;
 use swoop_core::{
-    Account, AccountInfo, ErrorClass, HostError, HostPolicy, HttpFailure, ResolveRequest, Resolved,
-    default_classify,
+    Account, AccountInfo, AccountKind, ErrorClass, HostError, HostPolicy, HttpFailure,
+    ResolveRequest, Resolved, default_classify,
 };
 use swoop_net::reqwest;
 use url::Url;
@@ -114,6 +114,11 @@ pub trait HostPlugin: Send + Sync {
     /// Servidores com conta, para a interface oferecer (chaves de servidor).
     fn account_hosts(&self, _rules: &Rules) -> Vec<String> {
         Vec::new()
+    }
+
+    /// Tipos de conta que o plugin sabe usar (usuário e senha, chave da API).
+    fn account_kinds(&self) -> Vec<AccountKind> {
+        vec![AccountKind::Login, AccountKind::ApiKey]
     }
 
     /// Confere a conta no site: premium, validade, tráfego.
