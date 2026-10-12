@@ -219,6 +219,14 @@ fn is_method(i: &ElementRef<'_>) -> bool {
 fn free(doc: &Html, mut form: Form, page_url: &Url, rules: &XfsRules) -> Result<Free, HostError> {
     form.fields.retain(|(k, _)| k != "method_premium");
     let (countdown_secs, countdown_found) = scan::countdown(doc, rules)?;
+    if countdown_secs > rules.max_countdown_secs {
+        // Encurtar seria enviar antes da hora; esperar às cegas, travar o
+        // download. A página fica salva para diagnóstico (`ctx.changed`).
+        return Err(HostError::Changed(format!(
+            "contador de {countdown_secs} s acima do teto das regras ({} s)",
+            rules.max_countdown_secs
+        )));
+    }
     Ok(Free {
         form,
         countdown_secs,

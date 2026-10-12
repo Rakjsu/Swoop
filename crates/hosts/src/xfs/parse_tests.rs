@@ -98,6 +98,22 @@ fn download_gratis_com_recaptcha_e_contador() {
 }
 
 #[test]
+fn contador_acima_do_teto_nunca_e_encurtado() {
+    // 900 s numa página que as regras limitam a 600: falha clara (a página
+    // fica salva), em vez de enviar o formulário aos 600 s.
+    let html = fixture("fastfile_page2.html").replace(
+        "<span class=\"seconds\">30</span>",
+        "<span class=\"seconds\">900</span>",
+    );
+    assert!(html.contains(">900<"), "fixture mudou");
+    let res = step(&html, &page(), &rules(), T0);
+    assert!(
+        matches!(&res, Err(HostError::Changed(m)) if m.contains("900 s")),
+        "{res:?}"
+    );
+}
+
+#[test]
 fn captcha_de_imagem_e_de_digitos() {
     let katfile = Url::parse("https://katfile.com/abcdefgh1234").unwrap();
     let Step::Download2(free) =

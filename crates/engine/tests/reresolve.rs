@@ -128,3 +128,30 @@ async fn html_como_anexo_ainda_e_arquivo() {
     completed(&row);
     assert_eq!(calls, 1);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn erro_em_json_tambem_e_pagina() {
+    // `{"error":"Denied by IP"}` no lugar do arquivo nunca vira o download.
+    let srv = TestServer::start().await.unwrap();
+    let json = srv.file_url("negado.bin", "size=64&ctype=application/json");
+    let (row, calls, dest) = run_links(vec![json]).await;
+    assert_eq!(row.state, swoop_core::DownloadState::Failed);
+    assert_eq!(calls, 2);
+    let files = std::fs::read_dir(&dest).map_or(0, |d| d.count());
+    assert_eq!(files, 0, "nada gravado em {}", dest.display());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sem_range_o_link_e_pedido_uma_vez_so() {
+    // Link de sessão (uso único): a resposta da sonda já é o download.
+    let srv = TestServer::start().await.unwrap();
+    let size = 3 * 1024 * 1024;
+    let url = srv.file_url("unico.bin", &format!("size={size}&seed=8&norange=1"));
+    let (row, calls, _) = run_links(vec![url]).await;
+    completed(&row);
+    assert_eq!(row.size, Some(size));
+    assert_eq!(calls, 1);
+    let stats = srv.stats();
+    assert_eq!(stats.requests, 1, "o link foi pedido mais de uma vez");
+    assert_eq!(stats.bytes_sent, size, "baixou mais que o arquivo");
+}

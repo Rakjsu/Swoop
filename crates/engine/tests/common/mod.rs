@@ -62,7 +62,7 @@ impl Harness {
         let pkg = self.pkg;
         let id = self
             .store
-            .call(move |c| downloads::insert(c, pkg, &url))
+            .call(move |c| downloads::insert(c, pkg, &url, None))
             .await
             .unwrap();
         self.engine.wake();

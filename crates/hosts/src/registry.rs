@@ -75,11 +75,15 @@ impl Registry {
     }
 
     /// Chave do servidor para limites: o plugin ou, no link direto, o
-    /// domínio (a mesma que o `Resolved::direct` usa).
+    /// domínio sem `www.` (a mesma que o `Resolved::direct` e o agendador usam).
     pub fn host_key(&self, url: &Url) -> String {
         match self.plugin_for(url) {
             Some(p) => p.host_key(url),
-            None => url.host_str().unwrap_or(DIRECT).to_ascii_lowercase(),
+            None => url
+                .host_str()
+                .unwrap_or(DIRECT)
+                .trim_start_matches("www.")
+                .to_ascii_lowercase(),
         }
     }
 
@@ -192,6 +196,18 @@ mod tests {
         assert_eq!(host("https://exemplo.com/a.zip"), DIRECT);
         // página inicial do servidor não é arquivo: fica como link comum
         assert_eq!(host("https://pixeldrain.com/"), DIRECT);
+    }
+
+    #[test]
+    fn chave_do_link_direto_sem_www() {
+        // A mesma chave do agendador e do `Resolved::direct`: as esperas de
+        // um servidor valem com ou sem `www.`.
+        let r = registry();
+        let key = |s: &str| r.host_key(&Url::parse(s).unwrap());
+        assert_eq!(key("https://www.Exemplo.com/a.zip"), "exemplo.com");
+        assert_eq!(key("https://exemplo.com/b.zip"), "exemplo.com");
+        let direct = Resolved::direct(Url::parse("https://www.exemplo.com/a.zip").unwrap());
+        assert_eq!(direct.host_key, "exemplo.com");
     }
 
     #[test]

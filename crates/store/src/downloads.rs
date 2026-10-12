@@ -82,12 +82,25 @@ fn from_row(r: &Row<'_>) -> rusqlite::Result<DownloadRow> {
     })
 }
 
-/// Adiciona um link no fim da fila, já como `queued`.
-pub fn insert(c: &Connection, package: PackageId, url: &str) -> Result<DownloadId, StoreError> {
+/// Adiciona um link no fim da fila, já como `queued`. `host_key` é a chave
+/// do servidor já conhecida pelo link (esperas e limites valem antes de
+/// resolver: `rg.to` e `rapidgator.net` são o mesmo servidor).
+pub fn insert(
+    c: &Connection,
+    package: PackageId,
+    url: &str,
+    host_key: Option<&str>,
+) -> Result<DownloadId, StoreError> {
     c.execute(
-        "INSERT INTO downloads (package_id, url, state, position, created_at)
-         VALUES (?1, ?2, ?3, (SELECT COALESCE(MAX(position), 0) + 1 FROM downloads), ?4)",
-        params![package.0, url, DownloadState::Queued.as_str(), now_ms()],
+        "INSERT INTO downloads (package_id, url, host_key, state, position, created_at)
+         VALUES (?1, ?2, ?3, ?4, (SELECT COALESCE(MAX(position), 0) + 1 FROM downloads), ?5)",
+        params![
+            package.0,
+            url,
+            host_key,
+            DownloadState::Queued.as_str(),
+            now_ms()
+        ],
     )?;
     Ok(DownloadId(c.last_insert_rowid()))
 }

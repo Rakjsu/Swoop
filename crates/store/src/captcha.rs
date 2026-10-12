@@ -70,7 +70,7 @@ mod tests {
         let mut c = Connection::open_in_memory().unwrap();
         crate::migrations::run(&mut c).unwrap();
         let pkg = packages::insert(&c, "p", Path::new("/tmp"), false).unwrap();
-        let id = downloads::insert(&c, pkg, "http://x/a").unwrap();
+        let id = downloads::insert(&c, pkg, "http://x/a", None).unwrap();
         assert_eq!(take_answer(&c, id).unwrap(), None);
         set_challenge(&c, id, "{\"d\":1}").unwrap();
         assert_eq!(challenge(&c, id).unwrap().as_deref(), Some("{\"d\":1}"));

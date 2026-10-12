@@ -74,8 +74,8 @@ pub struct XfsRules {
     /// Espera quando a página não mostra o contador de forma legível: o
     /// formulário final nunca sai antes disso.
     pub fallback_countdown_secs: u64,
-    /// Teto do contador aceito (segundos); acima disso é "espere até o
-    /// próximo download".
+    /// Teto do contador aceito (segundos). Acima dele a página é tratada
+    /// como não entendida (fica salva): nunca se envia antes da hora.
     pub max_countdown_secs: u64,
     /// "Você precisa esperar X horas, Y minutos, Z segundos".
     pub wait_pattern: String,

@@ -41,12 +41,20 @@ pub async fn expand_all(registry: &Registry, urls: Vec<Url>) -> Vec<Url> {
     out
 }
 
-/// Cria um pacote com os links e acorda o motor. Com `dest`, tudo vai para
-/// lá; sem, a pasta é automática por tipo (vídeos, músicas, downloads).
+/// Links com a chave do servidor (`Registry::host_key`), prontos para a fila.
+pub fn keyed(registry: &Registry, urls: &[Url]) -> Vec<(String, String)> {
+    urls.iter()
+        .map(|u| (u.to_string(), registry.host_key(u)))
+        .collect()
+}
+
+/// Cria um pacote com os links (e a chave do servidor de cada um) e acorda o
+/// motor. Com `dest`, tudo vai para lá; sem, a pasta é automática por tipo
+/// (vídeos, músicas, downloads).
 pub async fn enqueue(
     store: &Store,
     engine: &Engine,
-    urls: Vec<String>,
+    links: Vec<(String, String)>,
     dest: Option<&Path>,
     package_name: &str,
 ) -> Result<Vec<DownloadId>, ServiceError> {
@@ -58,7 +66,10 @@ pub async fn enqueue(
     let ids = store
         .call(move |c| {
             let pkg = packages::insert(c, &name, &dest, auto)?;
-            urls.iter().map(|u| downloads::insert(c, pkg, u)).collect()
+            links
+                .iter()
+                .map(|(url, host)| downloads::insert(c, pkg, url, Some(host)))
+                .collect()
         })
         .await?;
     engine.wake();

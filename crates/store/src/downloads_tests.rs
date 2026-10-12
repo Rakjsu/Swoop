@@ -12,8 +12,8 @@ fn setup() -> (Connection, PackageId) {
 #[test]
 fn insere_na_ordem_da_fila() {
     let (c, pkg) = setup();
-    let a = insert(&c, pkg, "http://x/a").unwrap();
-    let b = insert(&c, pkg, "http://x/b").unwrap();
+    let a = insert(&c, pkg, "http://x/a", None).unwrap();
+    let b = insert(&c, pkg, "http://x/b", None).unwrap();
     let q = queued(&c, 10).unwrap();
     assert_eq!(q.iter().map(|r| r.id).collect::<Vec<_>>(), vec![a, b]);
     assert_eq!(q[0].state, DownloadState::Queued);
@@ -22,7 +22,7 @@ fn insere_na_ordem_da_fila() {
 #[test]
 fn transicao_valida_grava_e_invalida_recusa() {
     let (c, pkg) = setup();
-    let id = insert(&c, pkg, "http://x/a").unwrap();
+    let id = insert(&c, pkg, "http://x/a", None).unwrap();
     assert_eq!(
         transition(&c, id, Event::Start).unwrap(),
         DownloadState::Resolving
@@ -39,7 +39,7 @@ fn transicao_valida_grava_e_invalida_recusa() {
 #[test]
 fn espera_vencida_volta_para_fila() {
     let (c, pkg) = setup();
-    let id = insert(&c, pkg, "http://x/a").unwrap();
+    let id = insert(&c, pkg, "http://x/a", None).unwrap();
     transition(&c, id, Event::Start).unwrap();
     wait(&c, id, 1_000, WaitReason::Backoff, Some("tentativa 1")).unwrap();
     let row = get(&c, id).unwrap().unwrap();
@@ -56,7 +56,7 @@ fn espera_vencida_volta_para_fila() {
 #[test]
 fn falha_grava_motivo_e_nova_tentativa_limpa() {
     let (c, pkg) = setup();
-    let id = insert(&c, pkg, "http://x/a").unwrap();
+    let id = insert(&c, pkg, "http://x/a", None).unwrap();
     transition(&c, id, Event::Start).unwrap();
     fail(&c, id, Event::Fail, "http", "HTTP 404").unwrap();
     let row = get(&c, id).unwrap().unwrap();
@@ -73,8 +73,8 @@ fn falha_grava_motivo_e_nova_tentativa_limpa() {
 #[test]
 fn reabrir_recupera_ativos() {
     let (c, pkg) = setup();
-    let a = insert(&c, pkg, "http://x/a").unwrap();
-    let b = insert(&c, pkg, "http://x/b").unwrap();
+    let a = insert(&c, pkg, "http://x/a", None).unwrap();
+    let b = insert(&c, pkg, "http://x/b", None).unwrap();
     transition(&c, a, Event::Start).unwrap();
     transition(&c, a, Event::Resolved).unwrap();
     transition(&c, b, Event::Pause).unwrap();
@@ -86,7 +86,7 @@ fn reabrir_recupera_ativos() {
 #[test]
 fn sonda_e_caminho_final() {
     let (c, pkg) = setup();
-    let id = insert(&c, pkg, "http://x/a").unwrap();
+    let id = insert(&c, pkg, "http://x/a", None).unwrap();
     let probe = ProbeInfo {
         host_key: "x".into(),
         file_name: "a.bin".into(),
@@ -109,8 +109,8 @@ fn sonda_e_caminho_final() {
 #[test]
 fn remover_registra_historico_e_apaga_pacote_vazio() {
     let (mut c, pkg) = setup();
-    let a = insert(&c, pkg, "http://x/a").unwrap();
-    let b = insert(&c, pkg, "http://x/b").unwrap();
+    let a = insert(&c, pkg, "http://x/a", None).unwrap();
+    let b = insert(&c, pkg, "http://x/b", None).unwrap();
     let seg = crate::SegmentRow {
         idx: 0,
         start: 0,
@@ -139,7 +139,7 @@ fn remover_registra_historico_e_apaga_pacote_vazio() {
 #[test]
 fn remover_concluido_nao_duplica_historico() {
     let (mut c, pkg) = setup();
-    let id = insert(&c, pkg, "http://x/a").unwrap();
+    let id = insert(&c, pkg, "http://x/a", None).unwrap();
     for ev in [
         Event::Start,
         Event::Resolved,
@@ -152,4 +152,14 @@ fn remover_concluido_nao_duplica_historico() {
     crate::history::record(&c, id, crate::history::Outcome::Completed).unwrap();
     remove(&mut c, id).unwrap();
     assert_eq!(crate::history::count(&c).unwrap(), 1);
+}
+
+#[test]
+fn chave_do_servidor_ja_na_insercao() {
+    let (c, pkg) = setup();
+    let id = insert(&c, pkg, "https://rg.to/file/abc", Some("rapidgator")).unwrap();
+    assert_eq!(
+        get(&c, id).unwrap().unwrap().host_key.as_deref(),
+        Some("rapidgator")
+    );
 }

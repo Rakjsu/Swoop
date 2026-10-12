@@ -92,8 +92,8 @@ mod tests {
         let mut c = Connection::open_in_memory().unwrap();
         crate::migrations::run(&mut c).unwrap();
         let pkg = packages::insert(&c, "p", Path::new("/tmp"), false).unwrap();
-        let a = downloads::insert(&c, pkg, "http://x/a").unwrap();
-        let b = downloads::insert(&c, pkg, "http://x/b").unwrap();
+        let a = downloads::insert(&c, pkg, "http://x/a", None).unwrap();
+        let b = downloads::insert(&c, pkg, "http://x/b", None).unwrap();
         record(&c, a, Outcome::Completed).unwrap();
         record(&c, b, Outcome::Removed).unwrap();
         let rows = list(&c, 10).unwrap();

@@ -155,8 +155,8 @@ impl Service {
         package_name: &str,
     ) -> Result<Vec<DownloadId>, ServiceError> {
         let urls = links::prepare(&self.hosts, links).await?;
-        let urls = urls.into_iter().map(String::from).collect();
-        let ids = links::enqueue(&self.store, &self.engine, urls, dest, package_name).await?;
+        let keyed = links::keyed(&self.hosts, &urls);
+        let ids = links::enqueue(&self.store, &self.engine, keyed, dest, package_name).await?;
         let _ = self.pushes.send(Push::Changed);
         Ok(ids)
     }

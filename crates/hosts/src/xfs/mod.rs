@@ -14,7 +14,7 @@ mod scan;
 
 use crate::page::{self, Page};
 use crate::plugin::{FileInfo, HostCtx, HostPlugin};
-use crate::rules::{Rules, XfsRules};
+use crate::rules::Rules;
 use async_trait::async_trait;
 use parse::{Final, Step};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -34,10 +34,10 @@ fn now_ms() -> i64 {
         .map_or(0, |d| d.as_millis() as i64)
 }
 
-/// Espera até `until_ms` (no máximo o teto de contador das regras).
-async fn wait_until(until_ms: i64, rules: &XfsRules) {
+/// Espera até `until_ms`, inteira (o contador já foi conferido contra o
+/// teto das regras ao ler a página).
+async fn wait_until(until_ms: i64) {
     let left = (until_ms - now_ms()).max(0) as u64;
-    let left = left.min(rules.max_countdown_secs * 1000);
     if left > 0 {
         tokio::time::sleep(Duration::from_millis(left)).await;
     }
@@ -141,7 +141,7 @@ impl Xfs {
 
     /// Resposta do usuário: espera o que falta do contador e envia.
     async fn answer(ctx: &HostCtx, a: &CaptchaAnswer) -> Result<Option<Resolved>, HostError> {
-        wait_until(a.challenge.not_before_ms, &ctx.rules.xfs).await;
+        wait_until(a.challenge.not_before_ms).await;
         let mut fields = a.challenge.fields.clone();
         fields.push((a.challenge.answer_field.clone(), a.token.clone()));
         Self::submit(ctx, &a.challenge.action, &fields, &a.challenge.page_url).await
@@ -226,7 +226,7 @@ impl HostPlugin for Xfs {
                 not_before_ms,
             }))),
             None => {
-                wait_until(not_before_ms, &ctx.rules.xfs).await;
+                wait_until(not_before_ms).await;
                 Self::submit(ctx, &action, &free.form.fields, &req.url)
                     .await?
                     .ok_or_else(|| {

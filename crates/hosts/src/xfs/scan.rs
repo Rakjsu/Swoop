@@ -1,8 +1,9 @@
 //! XFileSharing, leituras tolerantes (puras): o contador em vários formatos
 //! e o link final quando a página não o traz no lugar de sempre.
 //!
-//! O contador nunca é pulado: sem número legível na página, vale a espera
-//! padrão das regras (`fallback_countdown_secs`).
+//! O contador nunca é pulado nem encurtado: sem número legível na página,
+//! vale a espera padrão das regras (`fallback_countdown_secs`); acima do teto
+//! das regras quem decide é `parse::step` (falha clara, nunca menos espera).
 
 use crate::page;
 use crate::rules::XfsRules;
@@ -18,7 +19,7 @@ pub fn countdown(doc: &Html, rules: &XfsRules) -> Result<(u64, bool), HostError>
         .or(page::attr(doc, "[data-seconds]", "data-seconds")?.and_then(|t| digits(&t)))
         .or_else(|| from_scripts(doc, &rules.countdown_script_pattern));
     Ok(match found {
-        Some(secs) => (secs.min(rules.max_countdown_secs), true),
+        Some(secs) => (secs, true),
         None => (rules.fallback_countdown_secs, false),
     })
 }

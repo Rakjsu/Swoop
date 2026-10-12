@@ -71,8 +71,10 @@ async fn servidor_sem_range_usa_uma_conexao() {
         sha256_hex(effective_seed(5, 0), size)
     );
     assert!(!row.resumable);
-    // Sonda + uma única requisição do arquivo.
-    assert_eq!(srv.stats().requests, 2);
+    // A resposta da sonda já é o download: uma única requisição, sem
+    // baixar nada a mais.
+    let stats = srv.stats();
+    assert_eq!((stats.requests, stats.bytes_sent), (1, size));
 }
 
 /// Portão 1d: ETag trocado entre sessões → detecta e recomeça do zero.
