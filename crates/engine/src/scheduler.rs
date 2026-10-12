@@ -32,7 +32,7 @@ pub async fn run(inner: Arc<Inner>) {
     }
 }
 
-/// Remove da lista os jobs que já terminaram.
+/// Remove da lista os jobs que terminaram sem sair dela sozinhos (pânico).
 fn reap(inner: &Inner) {
     inner
         .active
@@ -213,6 +213,10 @@ fn spawn_job(inner: &Arc<Inner>, settings: &Settings, id: DownloadId, host: Stri
     tracing::info!(id = id.0, host = %host, conns = grant, "iniciando");
     let handle = tokio::spawn(async move {
         job::run(ctx, id).await;
+        // Sai do mapa antes de avisar: a vaga e as conexões ficam livres já
+        // nesta volta do agendador, sem esperar a tarefa acabar de fechar.
+        // Um job novo do mesmo id só entra depois que este saiu (`grant_for`).
+        waker.active.lock().expect("mutex").remove(&id);
         waker.wake.notify_one();
     });
     active.insert(
