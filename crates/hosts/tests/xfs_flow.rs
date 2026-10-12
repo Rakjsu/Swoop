@@ -93,7 +93,7 @@ async fn sem_captcha_premium_e_espera_entre_downloads() {
     let premium = srv.xfs_url(CODE, "premium_only=1");
     assert_eq!(
         reg.resolve(&req(&premium)).await.unwrap_err(),
-        HostError::PremiumOnly
+        HostError::PremiumOnly(None)
     );
 }
 

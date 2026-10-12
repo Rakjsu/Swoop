@@ -12,36 +12,19 @@ mod parse;
 mod premium;
 mod scan;
 
+use crate::flow::{now_ms, session_resolved, wait_until};
 use crate::page::{self, Page};
 use crate::plugin::{FileInfo, HostCtx, HostPlugin};
-use crate::rules::{Rules, XfsRules};
+use crate::rules::Rules;
 use async_trait::async_trait;
 use parse::{Final, Step};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 use swoop_core::{
-    Account, AccountInfo, CaptchaAnswer, CaptchaChallenge, HostError, RangeStyle, ResolveRequest,
-    Resolved,
+    Account, AccountInfo, CaptchaAnswer, CaptchaChallenge, HostError, ResolveRequest, Resolved,
 };
-use swoop_net::reqwest::cookie::CookieStore;
 use url::Url;
 
 pub struct Xfs;
-
-/// Agora em ms Unix.
-fn now_ms() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_millis() as i64)
-}
-
-/// Espera até `until_ms` (no máximo o teto de contador das regras).
-async fn wait_until(until_ms: i64, rules: &XfsRules) {
-    let left = (until_ms - now_ms()).max(0) as u64;
-    let left = left.min(rules.max_countdown_secs * 1000);
-    if left > 0 {
-        tokio::time::sleep(Duration::from_millis(left)).await;
-    }
-}
 
 impl Xfs {
     /// Link direto pronto para o motor, com os cookies da sessão do site.
@@ -53,22 +36,14 @@ impl Xfs {
         } else {
             (rules.free_connections, rules.free_resumable)
         };
-        let mut r = Resolved::direct(link.clone());
-        r.headers.push(("Referer".into(), referer.to_string()));
-        if let Some(cookie) = ctx
-            .jar
-            .cookies(&link)
-            .and_then(|v| v.to_str().ok().map(str::to_owned))
-        {
-            r.headers.push(("Cookie".into(), cookie));
-        }
-        r.max_connections = connections.max(1);
-        r.resumable = resumable;
-        if !resumable {
-            r.range = RangeStyle::None;
-        }
-        r.host_key = site_key(referer);
-        r
+        session_resolved(
+            ctx,
+            link,
+            referer,
+            connections,
+            resumable,
+            site_key(referer),
+        )
     }
 
     /// Página do download grátis a partir da página do arquivo.
@@ -141,7 +116,7 @@ impl Xfs {
 
     /// Resposta do usuário: espera o que falta do contador e envia.
     async fn answer(ctx: &HostCtx, a: &CaptchaAnswer) -> Result<Option<Resolved>, HostError> {
-        wait_until(a.challenge.not_before_ms, &ctx.rules.xfs).await;
+        wait_until(a.challenge.not_before_ms).await;
         let mut fields = a.challenge.fields.clone();
         fields.push((a.challenge.answer_field.clone(), a.token.clone()));
         Self::submit(ctx, &a.challenge.action, &fields, &a.challenge.page_url).await
@@ -224,9 +199,10 @@ impl HostPlugin for Xfs {
                 fields: free.form.fields,
                 answer_field,
                 not_before_ms,
+                expires_at_ms: None,
             }))),
             None => {
-                wait_until(not_before_ms, &ctx.rules.xfs).await;
+                wait_until(not_before_ms).await;
                 Self::submit(ctx, &action, &free.form.fields, &req.url)
                     .await?
                     .ok_or_else(|| {

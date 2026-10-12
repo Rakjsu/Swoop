@@ -7,8 +7,8 @@ use crate::rules::Rules;
 use async_trait::async_trait;
 use std::sync::Arc;
 use swoop_core::{
-    Account, AccountInfo, ErrorClass, HostError, HttpFailure, ResolveRequest, Resolved,
-    default_classify,
+    Account, AccountInfo, AccountKind, ErrorClass, HostError, HostPolicy, HttpFailure,
+    ResolveRequest, Resolved, default_classify,
 };
 use swoop_net::reqwest;
 use url::Url;
@@ -94,6 +94,18 @@ pub trait HostPlugin: Send + Sync {
         default_classify(failure)
     }
 
+    /// Regras de agendamento do servidor `host_key`, se ele for deste
+    /// plugin (`None` = não é dele, ou só os limites gerais).
+    fn host_policy(&self, _ctx: &HostCtx, _host_key: &str) -> Option<HostPolicy> {
+        None
+    }
+
+    /// Domínios que o detector de links procura para este plugin (links
+    /// colados sem `https://`).
+    fn detect_hosts<'r>(&self, _rules: &'r Rules) -> Vec<&'r str> {
+        Vec::new()
+    }
+
     /// Esta chave de servidor aceita conta premium neste plugin?
     fn accepts_account(&self, _host_key: &str, _rules: &Rules) -> bool {
         false
@@ -102,6 +114,11 @@ pub trait HostPlugin: Send + Sync {
     /// Servidores com conta, para a interface oferecer (chaves de servidor).
     fn account_hosts(&self, _rules: &Rules) -> Vec<String> {
         Vec::new()
+    }
+
+    /// Tipos de conta que o plugin sabe usar (usuário e senha, chave da API).
+    fn account_kinds(&self) -> Vec<AccountKind> {
+        vec![AccountKind::Login, AccountKind::ApiKey]
     }
 
     /// Confere a conta no site: premium, validade, tráfego.

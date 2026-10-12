@@ -35,6 +35,8 @@ pub struct WorkerCtx {
     pub cancel: CancellationToken,
     pub max_retries: u32,
     pub progress: Arc<JobProgress>,
+    /// Resposta da sonda, usada pela primeira requisição sem Range.
+    pub first: Mutex<Option<crate::probe::Body>>,
 }
 
 /// Como terminou uma requisição que pode ser repetida.
@@ -76,7 +78,12 @@ pub async fn run(ctx: Arc<WorkerCtx>, worker: WorkerId) -> Result<(), TransferEr
                 progressed,
             }) => {
                 release(&ctx, claim.idx);
-                failures = if progressed { 1 } else { failures + 1 };
+                // Sem Range a faixa recomeça do zero: "progresso" não conta.
+                failures = if progressed && ctx.ranged {
+                    1
+                } else {
+                    failures + 1
+                };
                 if failures > ctx.max_retries {
                     return Err(TransferError::Transient(format!(
                         "{message} (desistindo após {failures} tentativas)"
@@ -121,6 +128,27 @@ fn release(ctx: &WorkerCtx, idx: u32) {
 
 /// Uma requisição da faixa `claim` até ela acabar, ser cortada ou falhar.
 async fn fetch(ctx: &WorkerCtx, claim: Claim) -> Result<Outcome, TransferError> {
+    let opened = (!ctx.ranged && claim.from == 0)
+        .then(|| ctx.first.lock().expect("resposta envenenada").take())
+        .flatten();
+    let resp = match opened {
+        Some(resp) => resp,
+        None => match send(ctx, claim).await? {
+            Ok(resp) => resp,
+            Err(outcome) => return Ok(outcome),
+        },
+    };
+    if let Some(outcome) = check_status(ctx, &resp, claim)? {
+        return Ok(outcome);
+    }
+    stream_body(ctx, claim, resp).await
+}
+
+/// Abre a requisição da faixa (`Err(outcome)` = falha de rede a repetir).
+async fn send(
+    ctx: &WorkerCtx,
+    claim: Claim,
+) -> Result<Result<reqwest::Response, Outcome>, TransferError> {
     let mut req = request::base(&ctx.client, &ctx.resolved);
     if ctx.ranged {
         req = req.header(
@@ -135,14 +163,15 @@ async fn fetch(ctx: &WorkerCtx, claim: Claim) -> Result<Outcome, TransferError> 
         _ = ctx.cancel.cancelled() => return Err(TransferError::Cancelled),
         r = req.send() => r,
     };
-    let resp = match sent {
-        Ok(r) => r,
-        Err(e) => return Ok(retry(None, request::describe(&e), false)),
-    };
-    if let Some(outcome) = check_status(ctx, &resp, claim)? {
-        return Ok(outcome);
-    }
+    Ok(sent.map_err(|e| retry(None, request::describe(&e), false)))
+}
 
+/// Lê o corpo, passa pelo limitador e entrega à escritora.
+async fn stream_body(
+    ctx: &WorkerCtx,
+    claim: Claim,
+    resp: reqwest::Response,
+) -> Result<Outcome, TransferError> {
     let mut stream = resp.bytes_stream();
     let mut progressed = false;
     loop {
@@ -201,6 +230,11 @@ fn check_status(
         }
         let f = request::status_failure(status, resp.headers(), SystemTime::now());
         return classify(ctx, &f).map(Some);
+    }
+    if !ctx.ranged && crate::probe::page_instead_of_file(resp.headers(), &ctx.resolved) {
+        // Link de sessão já usado ou negado: resolver de novo, sem gravar a
+        // página no lugar do arquivo.
+        return Err(TransferError::Reresolve);
     }
     if ctx.ranged {
         let start = resp

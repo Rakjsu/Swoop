@@ -22,10 +22,37 @@ pub struct Page {
     pub file: bool,
 }
 
+/// Tira sessão e token de um corpo antes de qualquer gravação (dump,
+/// diagnóstico); o corpo devolvido ao plugin fica inteiro.
+pub type Redact = fn(&str) -> String;
+
 /// GET simples pelo cliente de páginas.
 pub async fn get(ctx: &HostCtx, url: &Url) -> Result<Page, HostError> {
     let res = ctx.http.get(url.clone()).send().await.map_err(network)?;
-    into_page(ctx, res).await
+    into_page(ctx, res, None).await
+}
+
+/// GET de uma página com `Referer` (e, com `xhr`, como o JavaScript do site
+/// pede: `X-Requested-With` e `Accept` de JSON).
+pub async fn get_from(
+    ctx: &HostCtx,
+    url: &Url,
+    referer: &Url,
+    xhr: bool,
+    redact: Option<Redact>,
+) -> Result<Page, HostError> {
+    let mut req = ctx
+        .http
+        .get(url.clone())
+        .header(header::REFERER, referer.as_str());
+    if xhr {
+        req = req.header("X-Requested-With", "XMLHttpRequest").header(
+            header::ACCEPT,
+            "application/json, text/javascript, */*; q=0.01",
+        );
+    }
+    let res = req.send().await.map_err(network)?;
+    into_page(ctx, res, redact).await
 }
 
 /// POST de formulário pelo cliente de páginas. Se a resposta for o próprio
@@ -35,6 +62,16 @@ pub async fn post_form(
     url: &Url,
     fields: &[(String, String)],
 ) -> Result<Page, HostError> {
+    post_form_with(ctx, url, fields, None).await
+}
+
+/// POST de formulário com o corpo da resposta redigido nas gravações.
+pub async fn post_form_with(
+    ctx: &HostCtx,
+    url: &Url,
+    fields: &[(String, String)],
+    redact: Option<Redact>,
+) -> Result<Page, HostError> {
     let res = ctx
         .http
         .post(url.clone())
@@ -43,11 +80,15 @@ pub async fn post_form(
         .send()
         .await
         .map_err(network)?;
-    into_page(ctx, res).await
+    into_page(ctx, res, redact).await
 }
 
 /// Lê a resposta: arquivo (sem ler o corpo) ou página (até `MAX_PAGE`).
-async fn into_page(ctx: &HostCtx, res: Response) -> Result<Page, HostError> {
+async fn into_page(
+    ctx: &HostCtx,
+    res: Response,
+    redact: Option<Redact>,
+) -> Result<Page, HostError> {
     let status = res.status().as_u16();
     let url = res.url().clone();
     if is_file(res.headers()) {
@@ -59,7 +100,10 @@ async fn into_page(ctx: &HostCtx, res: Response) -> Result<Page, HostError> {
         });
     }
     let body = read_body(res).await?;
-    ctx.record(&url, status, &body);
+    match redact {
+        Some(r) => ctx.record(&url, status, &r(&body)),
+        None => ctx.record(&url, status, &body),
+    }
     Ok(Page {
         status,
         url,

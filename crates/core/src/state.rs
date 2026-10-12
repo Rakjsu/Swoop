@@ -155,6 +155,8 @@ impl DownloadState {
             (S::CaptchaNeeded, E::CaptchaSolved) => S::Queued,
             (S::CaptchaNeeded, E::Pause) => S::Paused,
             (S::CaptchaNeeded, E::Fail) => S::Failed,
+            // Captcha que passou do prazo do site: o usuário recomeça.
+            (S::CaptchaNeeded, E::Retry) => S::Queued,
             (from, event) => return Err(InvalidTransition { from, event }),
         };
         Ok(to)
@@ -217,6 +219,7 @@ mod tests {
         (S::CaptchaNeeded, E::CaptchaSolved, S::Queued),
         (S::CaptchaNeeded, E::Pause, S::Paused),
         (S::CaptchaNeeded, E::Fail, S::Failed),
+        (S::CaptchaNeeded, E::Retry, S::Queued),
     ];
 
     #[test]

@@ -61,10 +61,7 @@ impl Collector {
             return Err(ServiceError::BadLink("nenhum link no texto".into()));
         }
         let urls = links::expand_all(&self.hosts, found).await;
-        let keyed: Vec<(String, String)> = urls
-            .iter()
-            .map(|u| (u.to_string(), self.hosts.host_key(u)))
-            .collect();
+        let keyed = links::keyed(&self.hosts, &urls);
         let added = self
             .store
             .call(move |c| {
@@ -93,9 +90,9 @@ impl Collector {
             return Ok(Vec::new());
         }
         let names: Vec<String> = rows.iter().filter_map(display_name).collect();
-        let urls = rows.into_iter().map(|r| r.url).collect();
+        let keyed = rows.into_iter().map(|r| (r.url, r.host_key)).collect();
         let name = naming::package_name(&names);
-        let ids = links::enqueue(&self.store, &self.engine, urls, dest, &name).await?;
+        let ids = links::enqueue(&self.store, &self.engine, keyed, dest, &name).await?;
         self.changed();
         Ok(ids)
     }

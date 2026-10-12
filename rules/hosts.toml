@@ -96,3 +96,105 @@ account_page = "/?op=my_account"
 premium_until_pattern = "(?i)premium(?:\\s+account)?\\s+expires?[^0-9]{0,40}(\\d{4}-\\d{2}-\\d{2}(?:\\s+\\d{2}:\\d{2}(?::\\d{2})?)?)"
 premium_connections = 5
 premium_resumable = true
+
+# Rapidgator (rapidgator.net, rg.to, rapidgator.asia). A nuvem de
+# desenvolvimento não alcança o site: o fluxo foi reconstruído de fontes
+# abertas recentes (JDownloader RapidGatorNet.java 09/2026, pyload 0.60,
+# oc-proxy-downloader 10/2026). [S] = valor sem fonte direta (o mais
+# conservador). Grátis: página → AjaxStartTimer → contador → link pedido →
+# captcha (Turnstile) → link. Nada aqui encurta espera ou pula captcha.
+[rapidgator]
+hosts = ["rapidgator.net", "rg.to", "rapidgator.asia"]
+# Links de rg.to/rapidgator.asia são pedidos aqui (a chave do captcha só vale
+# no domínio dela).
+origin = "https://rapidgator.net"
+# Arquivo: /file/<32 hex | número>[/<nome>.html] (grupo 1 = id).
+file_pattern = "^/file/([0-9a-f]{32}|[0-9]+)(?:/[^/]+)?/?$"
+# Pasta: /folder/<número>[/<nome>.html].
+folder_pattern = "^/folder/([0-9]+)(?:/[^/]+)?/?$"
+cookie = "lang=en"
+name_pattern = "<title>\\s*Download file\\s+(.+?)\\s*</title>"
+size_pattern = "File size:\\s*<strong>\\s*([\\d.,]+\\s*[KMGT]?B)\\s*</strong>"
+# Variáveis do JavaScript da página (grupo 1 = nome, 2 = valor).
+var_pattern = "var\\s+(startTimerUrl|getDownloadUrl|captchaUrl|fid|secs)\\s*=\\s*'?([^';]*)'?\\s*;"
+start_timer_path = "/download/AjaxStartTimer"
+get_link_path = "/download/AjaxGetDownloadLink"
+captcha_path = "/download/captcha"
+# Respostas JSON esperadas ({"state":"started","sid":…} e {"state":"done"}).
+timer_ok = "started"
+link_ok = "done"
+# Contador: sem `secs` na página vale este; acima do teto = página não
+# entendida (nunca se envia antes); +margem para o relógio do site.
+fallback_countdown_secs = 60
+max_countdown_secs = 600
+countdown_margin_secs = 1
+# Formulário do captcha e onde vai a resposta (o token vai em todos).
+captcha_form_selector = "form#captchaform"
+answer_fields = ["DownloadCaptchaForm[verifyCode]", "cf-turnstile-response"]
+# Chave do Turnstile quando não vem em `data-sitekey`.
+turnstile_sitekey_pattern = "sitekey['\"]?\\s*[:=]\\s*['\"](0x[0-9A-Za-z_-]{10,})['\"]"
+# Prazo para a resposta depois que o captcha aparece (o J usa 105 s; envio
+# atrasado bloqueia o IP por 1 h ou mais). Com menos que `captcha_min_left_secs`
+# de folga, a resposta não é enviada.
+captcha_deadline_secs = 100
+captcha_min_left_secs = 15
+# Cookie que o site grava quando a resposta chegou tarde.
+late_captcha_cookie = "failed_on_captcha=1"
+late_captcha_wait_minutes = 60
+# Link final (grupo 1).
+final_link_patterns = [
+  "'(https?://[A-Za-z0-9_-]+\\.[^/'\"]+//\\?r=download/index&session_id=[A-Za-z0-9]+)'",
+  "return\\s+'(https?://[^']+)'",
+  "location\\.href\\s*=\\s*'(https?://[^']+)'",
+]
+# Textos (em minúsculas) de cada situação.
+wrong_captcha_markers = ["the verification code is incorrect", "please fix the following input errors"]
+offline_markers = ["404 file not found", ">error 404<", "e_filenotfound"]
+premium_markers = ["can be downloaded by premium only", "can be downloaded only by subscribers", "/wallet/buyfile/"]
+# "You can download files up to 500 MB in free mode" (grupo 1 = tamanho).
+free_size_pattern = "you can download files up to ([\\d.,]+\\s*[kmgt]?b) in free mode"
+# "Delay between downloads must be not less than 120 min" (grupo 1 = min).
+delay_pattern = "delay between downloads must be not less than\\s*(\\d+)\\s*min"
+hourly_markers = ["you have reached your hourly downloads limit"]
+# [S] pyload 60, oc-proxy 120: o mais conservador.
+hourly_wait_minutes = 120
+# Limite diário: até a próxima meia-noite UTC [S].
+daily_markers = ["you have reached your daily downloads limit", "you have reached your daily limit of downloads"]
+one_at_a_time_markers = ["download more than 1 file at a time in free mode", "file is already downloading"]
+# [S] o erro some em 30–60 s segundo o J.
+one_at_a_time_wait_minutes = 10
+unavailable_markers = ["file is temporarily not available", "downloading is not possible at the moment", "maintenance in data center", "an unexpected error occurred"]
+unavailable_wait_minutes = 30
+# Resposta fora do esperado no contador ou no link: esperar e recomeçar.
+state_error_wait_minutes = 5
+# Desafio do Cloudflare no site inteiro (só com HTTP 403/503).
+cloudflare_markers = ["<title>just a moment...</title>", "cf_chl_opt", "cf-browser-verification"]
+free_connections = 1
+free_resumable = false
+free_max_active = 1
+# Pastas (listadas pela página, `?page=N`).
+folder_file_pattern = "href=\"(/file/(?:[0-9a-f]{32}|[0-9]+)(?:/[^\"<>]+)?)\""
+folder_sub_pattern = "href=\"(/folder/[0-9]+/[^\"<>?]+)\""
+folder_page_pattern = "[?&]page=([0-9]+)"
+folder_missing_markers = ["e_foldernotfound"]
+folder_page_delay_ms = 500
+folder_max_pages = 50
+# Conta premium: API v2 (login por POST; o token fica só na memória).
+api_path = "/api/v2/"
+api_login = "user/login"
+api_user_info = "user/info"
+api_file_info = "file/info"
+api_file_download = "file/download"
+session_minutes = 45
+# Textos (minúsculas) do campo `details` da API.
+api_wait_markers = ["please wait"]
+api_wait_minutes = 5
+api_bad_login_markers = ["wrong e-mail or password", "error e-mail or password", "login or password is wrong", "password cannot be blank", "parameter login or password is missing"]
+api_unusual_ip_markers = ["unusual ip"]
+api_2fa_markers = ["auth code", "two-factor", "2fa"]
+api_locked_markers = ["user is frozen", "account is frozen", "account locked", "account is locked"]
+traffic_wait_minutes = 60
+# `file.mode_label` de arquivo pago/só de assinantes (minúsculas) [S].
+paid_markers = ["paid", "subscri"]
+premium_connections = 5
+premium_resumable = true

@@ -5,15 +5,22 @@
 //! conexões e downloads; `POST /admin/generation/{n}` "troca" todos os
 //! arquivos (novo conteúdo e novo ETag), para testar arquivo mudado no servidor.
 //! `/{code}` é um XFileSharing falso (download grátis com contador e captcha).
+//! Num segundo endereço (`rapidgator_*`), um Rapidgator falso (`rapidgator`).
 
 pub mod content;
 mod file;
 pub mod knobs;
+pub mod rapidgator;
+pub mod rapidgator_api;
+mod rapidgator_captcha;
+pub mod rapidgator_folder;
+mod rapidgator_pages;
 pub mod stats;
 pub mod xfs;
 pub mod xfs_premium;
 
-pub use content::{effective_seed, fill, sha256_hex};
+pub use content::{effective_seed, fill, md5_hex, sha256_hex};
+pub use rapidgator::RgStats;
 pub use stats::Stats;
 pub use xfs::XfsStats;
 
@@ -24,13 +31,15 @@ use file::Shared;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use tokio::sync::oneshot;
+use tokio::sync::watch;
 
 /// Servidor rodando em segundo plano; para quando é descartado.
 pub struct TestServer {
     addr: SocketAddr,
+    /// Endereço do Rapidgator falso (rotas próprias: `/file/{id}` colide).
+    rg_addr: SocketAddr,
     shared: Shared,
-    shutdown: Option<oneshot::Sender<()>>,
+    shutdown: Option<watch::Sender<bool>>,
 }
 
 impl TestServer {
@@ -46,23 +55,51 @@ impl TestServer {
             generation: Arc::new(AtomicU64::new(0)),
             requests: Arc::new(AtomicU64::new(0)),
             xfs: xfs::XfsState::default(),
+            rg: rapidgator::RgState::default(),
         };
-        let app = router(shared.clone());
         let listener = tokio::net::TcpListener::bind(addr).await?;
         let addr = listener.local_addr()?;
-        let (tx, rx) = oneshot::channel::<()>();
-        tokio::spawn(async move {
-            let _ = axum::serve(listener, app)
-                .with_graceful_shutdown(async {
-                    let _ = rx.await;
-                })
-                .await;
-        });
+        let rg_listener = tokio::net::TcpListener::bind(SocketAddr::new(addr.ip(), 0)).await?;
+        let rg_addr = rg_listener.local_addr()?;
+        let (tx, rx) = watch::channel(false);
+        let (main, rg) = (router(shared.clone()), rg_router(shared.clone()));
+        for (listener, app) in [(listener, main), (rg_listener, rg)] {
+            let mut stop = rx.clone();
+            tokio::spawn(async move {
+                let _ = axum::serve(listener, app)
+                    .with_graceful_shutdown(async move {
+                        let _ = stop.changed().await;
+                    })
+                    .await;
+            });
+        }
         Ok(Self {
             addr,
+            rg_addr,
             shared,
             shutdown: Some(tx),
         })
+    }
+
+    /// Origem do Rapidgator falso (`http://127.0.0.1:porta`).
+    pub fn rapidgator_origin(&self) -> String {
+        format!("http://{}", self.rg_addr)
+    }
+
+    /// Página de um arquivo no Rapidgator falso (`id` com 32 hex, botões em
+    /// `query`).
+    pub fn rapidgator_url(&self, id: &str, name: &str, query: &str) -> String {
+        format!("http://{}/file/{id}/{name}.html?{query}", self.rg_addr)
+    }
+
+    /// O que o Rapidgator falso viu.
+    pub fn rapidgator_stats(&self) -> RgStats {
+        self.shared.rg.stats()
+    }
+
+    /// Estado do Rapidgator falso (arquivo premium, sessões, tráfego).
+    pub fn rapidgator(&self) -> &rapidgator::RgState {
+        &self.shared.rg
     }
 
     /// Endereço real (porta escolhida pelo SO).
@@ -115,7 +152,7 @@ impl TestServer {
 impl Drop for TestServer {
     fn drop(&mut self) {
         if let Some(tx) = self.shutdown.take() {
-            let _ = tx.send(());
+            let _ = tx.send(true);
         }
     }
 }
@@ -131,6 +168,30 @@ fn router(shared: Shared) -> Router {
         .route("/stats", get(stats_json))
         .route("/admin/generation/{n}", post(set_generation))
         .route("/admin/reset", post(reset))
+        .with_state(shared)
+}
+
+/// Rotas do Rapidgator falso.
+fn rg_router(shared: Shared) -> Router {
+    Router::new()
+        .route("/file/{id}", get(rapidgator::file_page))
+        .route("/file/{id}/{name}", get(rapidgator::file_page))
+        .route("/download/AjaxStartTimer", get(rapidgator::start_timer))
+        .route("/download/AjaxGetDownloadLink", get(rapidgator::get_link))
+        .route(
+            "/download/captcha",
+            get(rapidgator_captcha::captcha_page).post(rapidgator_captcha::captcha_submit),
+        )
+        .route("/dl/{token}/{name}", get(rapidgator_captcha::download))
+        .route("/api/v2/user/login", post(rapidgator_api::login))
+        .route("/api/v2/user/info", get(rapidgator_api::user_info))
+        .route("/api/v2/file/info", get(rapidgator_api::file_info))
+        .route("/api/v2/file/download", get(rapidgator_api::file_download))
+        .route(
+            "/premium/{id}/{name}",
+            get(rapidgator_api::premium_download),
+        )
+        .route("/folder/{n}/{name}", get(rapidgator_folder::folder))
         .with_state(shared)
 }
 

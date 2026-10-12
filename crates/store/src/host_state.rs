@@ -33,8 +33,14 @@ pub fn set_wait(
 /// Servidores ainda esperando em `now` (ms); as esperas vencidas saem.
 pub fn active(c: &Connection, now: i64) -> Result<Vec<HostWait>, StoreError> {
     c.execute("DELETE FROM host_state WHERE wait_until <= ?1", [now])?;
-    let mut stmt = c.prepare("SELECT host_key, wait_until, reason FROM host_state")?;
-    let rows = stmt.query_map([], |r| {
+    waiting(c, now)
+}
+
+/// Servidores ainda esperando em `now` (ms), só leitura (para a lista).
+pub fn waiting(c: &Connection, now: i64) -> Result<Vec<HostWait>, StoreError> {
+    let mut stmt =
+        c.prepare("SELECT host_key, wait_until, reason FROM host_state WHERE wait_until > ?1")?;
+    let rows = stmt.query_map([now], |r| {
         let reason: String = r.get(2)?;
         Ok(HostWait {
             host_key: r.get(0)?,
@@ -55,9 +61,11 @@ mod tests {
         crate::migrations::run(&mut c).unwrap();
         set_wait(&c, "fastfile", 5_000, WaitReason::HostLimit).unwrap();
         set_wait(&c, "fastfile", 3_000, WaitReason::HostLimit).unwrap(); // não encurta
+        assert_eq!(waiting(&c, 1_000).unwrap().len(), 1);
         let waits = active(&c, 1_000).unwrap();
         assert_eq!(waits.len(), 1);
         assert_eq!(waits[0].wait_until, 5_000);
+        assert!(waiting(&c, 5_000).unwrap().is_empty());
         assert!(active(&c, 5_000).unwrap().is_empty());
     }
 }

@@ -13,6 +13,7 @@
 //! | `valid_until` | ms Unix; depois disso responde 403 (link expirado)            |
 //! | `cd=1`        | envia Content-Disposition com o nome                          |
 //! | `ctype`       | Content-Type da resposta (padrão `application/octet-stream`)  |
+//! | `page_from`   | da requisição N do servidor em diante, 200 com uma página HTML |
 
 use serde::Deserialize;
 
@@ -31,6 +32,7 @@ pub struct Knobs {
     pub valid_until: Option<i64>,
     pub cd: u8,
     pub ctype: Option<String>,
+    pub page_from: Option<u64>,
 }
 
 impl Default for Knobs {
@@ -47,6 +49,7 @@ impl Default for Knobs {
             valid_until: None,
             cd: 0,
             ctype: None,
+            page_from: None,
         }
     }
 }

@@ -6,13 +6,13 @@ use crate::direct::{self, DirectResolver};
 use crate::dump::Dump;
 use crate::plugin::{FileInfo, HostCtx, HostPlugin};
 use crate::rules::Rules;
-use crate::{detect, gdrive, mediafire, pixeldrain, xfs};
+use crate::{detect, gdrive, mediafire, pixeldrain, rapidgator, xfs};
 use async_trait::async_trait;
 use std::path::PathBuf;
 use std::sync::Arc;
 use swoop_core::{
-    Account, AccountInfo, ErrorClass, HostError, HttpFailure, ResolveRequest, Resolved, Resolver,
-    default_classify,
+    Account, AccountInfo, AccountKind, ErrorClass, HostError, HostPolicy, HttpFailure,
+    ResolveRequest, Resolved, Resolver, default_classify,
 };
 use swoop_net::reqwest;
 use url::Url;
@@ -44,6 +44,8 @@ impl Registry {
                 Box::new(pixeldrain::Pixeldrain),
                 Box::new(mediafire::Mediafire),
                 Box::new(gdrive::Gdrive),
+                // Antes do XFS: um site XFS nunca reivindica /file/<id> do Rapidgator.
+                Box::new(rapidgator::Rapidgator),
                 Box::new(xfs::Xfs),
             ],
         })
@@ -75,18 +77,22 @@ impl Registry {
     }
 
     /// Chave do servidor para limites: o plugin ou, no link direto, o
-    /// domínio (a mesma que o `Resolved::direct` usa).
+    /// domínio sem `www.` (a mesma que o `Resolved::direct` e o agendador usam).
     pub fn host_key(&self, url: &Url) -> String {
         match self.plugin_for(url) {
             Some(p) => p.host_key(url),
-            None => url.host_str().unwrap_or(DIRECT).to_ascii_lowercase(),
+            None => url
+                .host_str()
+                .unwrap_or(DIRECT)
+                .trim_start_matches("www.")
+                .to_ascii_lowercase(),
         }
     }
 
     /// Links num texto qualquer.
     pub fn detect(&self, text: &str) -> Vec<Url> {
         let r = &self.ctx.rules;
-        let hosts: Vec<&str> = [
+        let mut hosts: Vec<&str> = [
             &r.pixeldrain.hosts,
             &r.mediafire.hosts,
             &r.gdrive.hosts,
@@ -96,6 +102,9 @@ impl Registry {
         .flatten()
         .map(String::as_str)
         .collect();
+        for p in &self.plugins {
+            hosts.extend(p.detect_hosts(r));
+        }
         detect::detect(text, &hosts)
     }
 
@@ -111,6 +120,15 @@ impl Registry {
             .iter()
             .flat_map(|p| p.account_hosts(rules))
             .collect()
+    }
+
+    /// Tipos de conta aceitos no servidor (vazio = não aceita conta).
+    pub fn account_kinds(&self, host_key: &str) -> Vec<AccountKind> {
+        self.plugins
+            .iter()
+            .find(|p| p.accepts_account(host_key, &self.ctx.rules))
+            .map(|p| p.account_kinds())
+            .unwrap_or_default()
     }
 
     /// Algum plugin aceita conta para esta chave de servidor?
@@ -166,6 +184,13 @@ impl Resolver for Registry {
             .find(|p| p.id() == host_key)
             .map_or_else(|| default_classify(failure), |p| p.classify(failure))
     }
+
+    fn host_policy(&self, host_key: &str) -> HostPolicy {
+        self.plugins
+            .iter()
+            .find_map(|p| p.host_policy(&self.ctx, host_key))
+            .unwrap_or_default()
+    }
 }
 
 #[cfg(test)]
@@ -195,8 +220,38 @@ mod tests {
     }
 
     #[test]
+    fn chave_do_link_direto_sem_www() {
+        // A mesma chave do agendador e do `Resolved::direct`: as esperas de
+        // um servidor valem com ou sem `www.`.
+        let r = registry();
+        let key = |s: &str| r.host_key(&Url::parse(s).unwrap());
+        assert_eq!(key("https://www.Exemplo.com/a.zip"), "exemplo.com");
+        assert_eq!(key("https://exemplo.com/b.zip"), "exemplo.com");
+        let direct = Resolved::direct(Url::parse("https://www.exemplo.com/a.zip").unwrap());
+        assert_eq!(direct.host_key, "exemplo.com");
+    }
+
+    #[test]
     fn detecta_com_os_hosts_das_regras() {
         let urls = registry().detect("baixe em pixeldrain.com/u/xyz789 ou drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWx/view");
         assert_eq!(urls.len(), 2);
+    }
+
+    #[test]
+    fn rapidgator_em_qualquer_dominio_e_um_servidor_so() {
+        let r = registry();
+        let id = "0123456789abcdef0123456789abcdef";
+        let urls = r.detect(&format!(
+            "parte 1: rg.to/file/{id}/a.part1.rar.html parte 2: https://rapidgator.net/file/{id}"
+        ));
+        assert_eq!(urls.len(), 2);
+        for u in &urls {
+            assert_eq!(r.host_of(u), "rapidgator");
+            assert_eq!(r.host_key(u), "rapidgator");
+        }
+        let policy = r.host_policy("rapidgator");
+        assert_eq!(policy.max_active, Some(1));
+        assert!(!policy.ignore_host_waits);
+        assert_eq!(r.host_policy("exemplo.com"), HostPolicy::default());
     }
 }

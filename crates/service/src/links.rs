@@ -41,12 +41,45 @@ pub async fn expand_all(registry: &Registry, urls: Vec<Url>) -> Vec<Url> {
     out
 }
 
-/// Cria um pacote com os links e acorda o motor. Com `dest`, tudo vai para
-/// lá; sem, a pasta é automática por tipo (vídeos, músicas, downloads).
+/// Links com a chave do servidor (`Registry::host_key`), prontos para a fila.
+pub fn keyed(registry: &Registry, urls: &[Url]) -> Vec<(String, String)> {
+    urls.iter()
+        .map(|u| (u.to_string(), registry.host_key(u)))
+        .collect()
+}
+
+/// Ao abrir: a chave do servidor das linhas que ainda vão andar passa a ser a
+/// do plugin atual (linhas de versões antigas tinham o domínio ou nada, e
+/// escapavam das regras do servidor, como o "um por vez" do Rapidgator).
+pub async fn rekey(store: &Store, registry: &Registry) -> Result<(), ServiceError> {
+    let rows = store.call(|c| downloads::list(c)).await?;
+    let changed: Vec<(DownloadId, String)> = rows
+        .iter()
+        .filter(|r| !r.state.is_final())
+        .filter_map(|r| {
+            let key = registry.host_key(&Url::parse(&r.url).ok()?);
+            (r.host_key.as_deref() != Some(key.as_str())).then_some((r.id, key))
+        })
+        .collect();
+    if !changed.is_empty() {
+        store
+            .call(move |c| {
+                changed
+                    .iter()
+                    .try_for_each(|(id, key)| downloads::set_host_key(c, *id, key))
+            })
+            .await?;
+    }
+    Ok(())
+}
+
+/// Cria um pacote com os links (e a chave do servidor de cada um) e acorda o
+/// motor. Com `dest`, tudo vai para lá; sem, a pasta é automática por tipo
+/// (vídeos, músicas, downloads).
 pub async fn enqueue(
     store: &Store,
     engine: &Engine,
-    urls: Vec<String>,
+    links: Vec<(String, String)>,
     dest: Option<&Path>,
     package_name: &str,
 ) -> Result<Vec<DownloadId>, ServiceError> {
@@ -58,7 +91,10 @@ pub async fn enqueue(
     let ids = store
         .call(move |c| {
             let pkg = packages::insert(c, &name, &dest, auto)?;
-            urls.iter().map(|u| downloads::insert(c, pkg, u)).collect()
+            links
+                .iter()
+                .map(|(url, host)| downloads::insert(c, pkg, url, Some(host)))
+                .collect()
         })
         .await?;
     engine.wake();

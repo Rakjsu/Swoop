@@ -124,7 +124,8 @@ impl Engine {
         Ok(())
     }
 
-    /// Nova tentativa de um download que falhou.
+    /// Nova tentativa de um download que falhou, ou recomeço de um captcha
+    /// que passou do prazo do site.
     pub async fn retry(&self, id: DownloadId) -> Result<(), StoreError> {
         self.inner
             .store

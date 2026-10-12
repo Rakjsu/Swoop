@@ -2,6 +2,7 @@
 //! de `(seed, i)`. Qualquer faixa é gerada sem disco e o sha256 esperado é
 //! calculável pelo teste.
 
+use md5::Md5;
 use sha2::{Digest, Sha256};
 
 /// Mistura de 64 bits (splitmix64): rápida e bem distribuída.
@@ -33,7 +34,17 @@ pub fn fill(seed: u64, offset: u64, buf: &mut [u8]) {
 
 /// sha256 (hex) do arquivo inteiro de `size` bytes.
 pub fn sha256_hex(seed: u64, size: u64) -> String {
-    let mut hasher = Sha256::new();
+    digest_hex::<Sha256>(seed, size)
+}
+
+/// md5 (hex) do arquivo inteiro de `size` bytes (o hash da API do Rapidgator).
+pub fn md5_hex(seed: u64, size: u64) -> String {
+    digest_hex::<Md5>(seed, size)
+}
+
+/// Hash (hex) do arquivo inteiro de `size` bytes.
+fn digest_hex<D: Digest>(seed: u64, size: u64) -> String {
+    let mut hasher = D::new();
     let mut buf = vec![0u8; 1 << 20];
     let mut offset = 0;
     while offset < size {

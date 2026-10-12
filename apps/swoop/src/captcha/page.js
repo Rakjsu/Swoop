@@ -2,8 +2,9 @@
 // deles executa, e a página é trocada por uma mínima com o widget oficial. A
 // origem continua sendo a do site (a chave do captcha só vale nela). A
 // resposta volta ao app navegando para https://swoop-captcha.invalid/.
-// A configuração { id, host, kind, render_at_ms } entra no fim do arquivo
-// (o Rust troca o marcador pelo JSON).
+// A configuração { id, host, kind, render_at_ms, expires_at_ms } entra no fim
+// do arquivo (o Rust troca o marcador pelo JSON). Com prazo do site
+// (`expires_at_ms`), a resposta nunca sai depois dele.
 (function (cfg) {
   "use strict";
   if (window.top !== window || location.hostname === "swoop-captcha.invalid") return;
@@ -31,6 +32,11 @@
     hcaptcha: ["https://js.hcaptcha.com/1/api.js", "hcaptcha"],
     turnstile: ["https://challenges.cloudflare.com/turnstile/v0/api.js", "turnstile"],
   };
+
+  // O prazo do site para a resposta já passou?
+  function expired() {
+    return cfg.expires_at_ms != null && Date.now() >= cfg.expires_at_ms;
+  }
 
   // Devolve a resposta (ou a desistência) ao app.
   function send(path, token) {
@@ -66,12 +72,37 @@
     );
     var box = el("div", "min-height:90px");
     body.appendChild(box);
+    var deadline = el("p", "margin:14px 0 0;color:#fbbf24");
+    deadline.id = "swoop-deadline";
+    body.appendChild(deadline);
     var cancel = el("button", "margin-top:24px;padding:6px 14px", "Cancelar");
     cancel.onclick = function () {
       send("cancel");
     };
     body.appendChild(cancel);
-    return { head: head, box: box };
+    return { head: head, box: box, deadline: deadline };
+  }
+
+  // Contagem do prazo do site; vencido, troca o captcha pelo aviso.
+  function tick(ui) {
+    if (cfg.expires_at_ms == null) return;
+    if (expired()) {
+      ui.box.textContent = "";
+      ui.deadline.textContent =
+        "O prazo do site acabou. Feche esta janela e clique em Recomeçar no Swoop.";
+      return;
+    }
+    var left = Math.ceil((cfg.expires_at_ms - Date.now()) / 1000);
+    ui.deadline.textContent = "Resolva em até " + left + " s (prazo do site).";
+    setTimeout(function () {
+      tick(ui);
+    }, 1000);
+  }
+
+  // Resposta pronta: só sai dentro do prazo.
+  function answer(ui, token) {
+    if (expired()) tick(ui);
+    else send("done", token);
   }
 
   // Widget oficial (reCAPTCHA, hCaptcha, Turnstile) renderizado na caixa.
@@ -81,7 +112,7 @@
       window[w[1]].render(ui.box, {
         sitekey: kind.site_key,
         callback: function (token) {
-          send("done", token);
+          answer(ui, token);
         },
       });
     };
@@ -108,7 +139,7 @@
     input.autocomplete = "off";
     var ok = el("button", "margin-left:8px;padding:6px 14px", "Enviar");
     function submit() {
-      if (input.value.trim()) send("done", input.value.trim());
+      if (input.value.trim()) answer(ui, input.value.trim());
     }
     ok.onclick = submit;
     input.onkeydown = function (e) {
@@ -131,8 +162,10 @@
       return;
     }
     ui.box.textContent = "";
+    if (expired()) return tick(ui);
     if (WIDGETS[cfg.kind.type]) widget(ui, cfg.kind);
     else typed(ui, cfg.kind);
+    tick(ui);
   }
 
   // Com o HTML do site lido (e nenhum script dele rodado), troca a página.

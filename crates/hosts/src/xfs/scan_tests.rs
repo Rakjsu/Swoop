@@ -27,8 +27,8 @@ fn contador_em_varios_formatos() {
         (60, true)
     );
     assert_eq!(count("<script>timer: '75'</script>"), (75, true));
-    // teto das regras
-    assert_eq!(count("<span class='seconds'>99999</span>"), (600, true));
+    // o número lido nunca é cortado (o teto é conferido em `parse::step`)
+    assert_eq!(count("<span class='seconds'>900</span>"), (900, true));
 }
 
 #[test]

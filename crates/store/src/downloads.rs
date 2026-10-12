@@ -48,12 +48,13 @@ pub struct ProbeInfo {
     pub part_path: PathBuf,
 }
 
-const COLUMNS: &str = "id, package_id, url, host_key, state, wait_until, wait_reason, error_kind,
+pub(crate) const COLUMNS: &str =
+    "id, package_id, url, host_key, state, wait_until, wait_reason, error_kind,
     error_msg, attempts, file_name, size, done_bytes, resumable, etag, last_modified, part_path,
     final_path, position, started_at, finished_at, captcha";
 
 /// Converte uma linha do SELECT padrão.
-fn from_row(r: &Row<'_>) -> rusqlite::Result<DownloadRow> {
+pub(crate) fn from_row(r: &Row<'_>) -> rusqlite::Result<DownloadRow> {
     let state: String = r.get(4)?;
     let wait_reason: Option<String> = r.get(6)?;
     Ok(DownloadRow {
@@ -82,38 +83,27 @@ fn from_row(r: &Row<'_>) -> rusqlite::Result<DownloadRow> {
     })
 }
 
-/// Adiciona um link no fim da fila, já como `queued`.
-pub fn insert(c: &Connection, package: PackageId, url: &str) -> Result<DownloadId, StoreError> {
+/// Adiciona um link no fim da fila, já como `queued`. `host_key` é a chave
+/// do servidor já conhecida pelo link (esperas e limites valem antes de
+/// resolver: `rg.to` e `rapidgator.net` são o mesmo servidor).
+pub fn insert(
+    c: &Connection,
+    package: PackageId,
+    url: &str,
+    host_key: Option<&str>,
+) -> Result<DownloadId, StoreError> {
     c.execute(
-        "INSERT INTO downloads (package_id, url, state, position, created_at)
-         VALUES (?1, ?2, ?3, (SELECT COALESCE(MAX(position), 0) + 1 FROM downloads), ?4)",
-        params![package.0, url, DownloadState::Queued.as_str(), now_ms()],
+        "INSERT INTO downloads (package_id, url, host_key, state, position, created_at)
+         VALUES (?1, ?2, ?3, ?4, (SELECT COALESCE(MAX(position), 0) + 1 FROM downloads), ?5)",
+        params![
+            package.0,
+            url,
+            host_key,
+            DownloadState::Queued.as_str(),
+            now_ms()
+        ],
     )?;
     Ok(DownloadId(c.last_insert_rowid()))
-}
-
-/// Busca um download.
-pub fn get(c: &Connection, id: DownloadId) -> Result<Option<DownloadRow>, StoreError> {
-    let sql = format!("SELECT {COLUMNS} FROM downloads WHERE id = ?1");
-    Ok(c.query_row(&sql, [id.0], from_row).optional()?)
-}
-
-/// Todos os downloads na ordem da fila.
-pub fn list(c: &Connection) -> Result<Vec<DownloadRow>, StoreError> {
-    let sql = format!("SELECT {COLUMNS} FROM downloads ORDER BY position");
-    let mut stmt = c.prepare(&sql)?;
-    let rows = stmt.query_map([], from_row)?;
-    Ok(rows.collect::<Result<_, _>>()?)
-}
-
-/// Próximos da fila (estado `queued`), na ordem.
-pub fn queued(c: &Connection, limit: usize) -> Result<Vec<DownloadRow>, StoreError> {
-    let sql = format!(
-        "SELECT {COLUMNS} FROM downloads WHERE state = 'queued' ORDER BY position LIMIT ?1"
-    );
-    let mut stmt = c.prepare(&sql)?;
-    let rows = stmt.query_map([limit as i64], from_row)?;
-    Ok(rows.collect::<Result<_, _>>()?)
 }
 
 /// Aplica um evento ao download e grava o novo estado (com efeitos colaterais
@@ -261,6 +251,16 @@ pub fn set_size(c: &Connection, id: DownloadId, size: u64) -> Result<(), StoreEr
     Ok(())
 }
 
+/// Troca a chave do servidor (links de antes de a chave ser gravada ao
+/// adicionar).
+pub fn set_host_key(c: &Connection, id: DownloadId, host_key: &str) -> Result<(), StoreError> {
+    c.execute(
+        "UPDATE downloads SET host_key = ?2 WHERE id = ?1",
+        params![id.0, host_key],
+    )?;
+    Ok(())
+}
+
 /// Tentativas seguidas sem progresso (para o limite de retentativas).
 pub fn set_attempts(c: &Connection, id: DownloadId, attempts: u32) -> Result<(), StoreError> {
     c.execute(
@@ -291,6 +291,10 @@ pub fn remove(c: &mut Connection, id: DownloadId) -> Result<Option<DownloadRow>,
     tx.commit()?;
     Ok(Some(row))
 }
+
+#[path = "downloads_read.rs"]
+mod read;
+pub use read::{get, in_state, list, queued, queued_after, queued_answered};
 
 #[cfg(test)]
 #[path = "downloads_tests.rs"]

@@ -17,7 +17,7 @@ use swoop_testsrv::xfs_premium::{KEY, PASS, USER};
 const MIB: u64 = 1024 * 1024;
 
 /// Tudo o que o `tracing` escreveu neste processo de teste.
-static LOGS: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+pub(super) static LOGS: Mutex<Vec<u8>> = Mutex::new(Vec::new());
 
 struct Capture;
 
@@ -32,7 +32,7 @@ impl Write for Capture {
 }
 
 /// Liga a captura dos logs (nível debug, todos os crates) uma vez só.
-fn capture_logs() {
+pub(super) fn capture_logs() {
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
         let _ = tracing_subscriber::fmt()
@@ -74,7 +74,7 @@ async fn row(svc: &Service, host: &str) -> AccountRow {
 }
 
 /// Todos os bytes dos arquivos de `dir` (recursivo) contêm `needle`?
-fn found_in_files(dir: &Path, needle: &[u8]) -> Vec<String> {
+pub(super) fn found_in_files(dir: &Path, needle: &[u8]) -> Vec<String> {
     let mut hits = Vec::new();
     for entry in std::fs::read_dir(dir).unwrap().flatten() {
         let path = entry.path();

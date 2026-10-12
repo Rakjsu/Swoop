@@ -4,13 +4,17 @@
 use crate::{Service, ServiceError};
 use swoop_api::Push;
 use swoop_core::{CaptchaChallenge, DownloadId, DownloadState, Event};
-use swoop_store::{captcha, downloads};
+use swoop_store::{captcha, downloads, now_ms};
 
 /// Maior token aceito (os do reCAPTCHA/hCaptcha têm poucos KiB).
 const MAX_TOKEN: usize = 16 * 1024;
+/// Resposta depois do prazo do site.
+pub const CAPTCHA_EXPIRED: &str =
+    "o prazo do site para este captcha acabou; clique em Recomeçar para pedir outro";
 
 impl Service {
-    /// Desafio pendente do download (`None` se não estiver esperando captcha).
+    /// Desafio pendente do download (`None` se não estiver esperando
+    /// captcha); passado o prazo do site, erro com o que fazer.
     pub async fn captcha_challenge(
         &self,
         id: DownloadId,
@@ -27,7 +31,11 @@ impl Service {
                 }
             })
             .await?;
-        Ok(json.and_then(|j| serde_json::from_str(&j).ok()))
+        let challenge: Option<CaptchaChallenge> = json.and_then(|j| serde_json::from_str(&j).ok());
+        if challenge.as_ref().is_some_and(|c| c.expired(now_ms())) {
+            return Err(ServiceError::BadInput(CAPTCHA_EXPIRED.into()));
+        }
+        Ok(challenge)
     }
 
     /// Resposta do usuário: guarda o token, devolve o download à fila e
@@ -39,12 +47,24 @@ impl Service {
                 "resposta de captcha inválida".into(),
             ));
         }
-        self.store
+        let expired = self
+            .store
             .call(move |c| {
+                let challenge = captcha::challenge(c, id)?
+                    .and_then(|j| serde_json::from_str::<CaptchaChallenge>(&j).ok());
+                if challenge.is_some_and(|ch| ch.expired(now_ms())) {
+                    // Nunca enviar depois do prazo (o site pune): fica para o
+                    // usuário recomeçar.
+                    return Ok(true);
+                }
                 downloads::transition(c, id, Event::CaptchaSolved)?;
-                captcha::set_token(c, id, &token)
+                captcha::set_token(c, id, &token)?;
+                Ok(false)
             })
             .await?;
+        if expired {
+            return Err(ServiceError::BadInput(CAPTCHA_EXPIRED.into()));
+        }
         self.engine.wake();
         let _ = self.pushes.send(Push::Changed);
         Ok(())

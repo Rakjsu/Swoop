@@ -83,7 +83,7 @@ mod tests {
         let mut c = Connection::open_in_memory().unwrap();
         crate::migrations::run(&mut c).unwrap();
         let pkg = packages::insert(&c, "p", std::path::Path::new("/tmp"), false).unwrap();
-        let id = downloads::insert(&c, pkg, "http://x/a").unwrap();
+        let id = downloads::insert(&c, pkg, "http://x/a", None).unwrap();
 
         let segs = [
             SegmentRow {

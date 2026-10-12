@@ -59,7 +59,7 @@ async fn wait_state(svc: &Service, id: DownloadId, want: DownloadState, secs: u6
 async fn captcha_notice(sub: &mut Subscription) -> (String, String) {
     tokio::time::timeout(Duration::from_secs(30), async {
         loop {
-            if let Some(Push::Notice(Notice::CaptchaNeeded { name, host })) = sub.next().await {
+            if let Some(Push::Notice(Notice::CaptchaNeeded { name, host, .. })) = sub.next().await {
                 return (name, host);
             }
         }

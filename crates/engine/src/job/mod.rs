@@ -68,10 +68,10 @@ async fn drive(ctx: &JobCtx, id: DownloadId) -> Result<u64, TransferError> {
     let mut page_retried = false;
     loop {
         let resolved = Arc::new(resolve(ctx, &url, attempt, captcha.take()).await?);
-        let probe = match probe::probe(&ctx.client, &resolved).await {
+        let (probe, body) = match probe::probe(&ctx.client, &resolved).await {
             // Página no lugar do arquivo: resolver de novo uma vez; se vier
             // página outra vez, falhar sem gravar nada.
-            Ok(p) if p.page && !page_retried => {
+            Ok((p, _)) if p.page && !page_retried => {
                 page_retried = true;
                 attempt += 1;
                 tracing::info!(
@@ -80,8 +80,8 @@ async fn drive(ctx: &JobCtx, id: DownloadId) -> Result<u64, TransferError> {
                 );
                 continue;
             }
-            Ok(p) if p.page => return Err(TransferError::Fatal(PAGE_NOT_FILE.into())),
-            Ok(p) => p,
+            Ok((p, _)) if p.page => return Err(TransferError::Fatal(PAGE_NOT_FILE.into())),
+            Ok(found) => found,
             Err(f) => match from_failure(ctx.resolver.as_ref(), &resolved.host_key, &f) {
                 // Link recém-resolvido já negado: resolver de novo (ainda em `resolving`).
                 TransferError::Reresolve if attempt < MAX_RERESOLVES => {
@@ -93,6 +93,8 @@ async fn drive(ctx: &JobCtx, id: DownloadId) -> Result<u64, TransferError> {
         };
         let prepared = prepare::prepare(ctx, id, &resolved, &probe).await?;
         transition(ctx, id, Event::Resolved).await?;
+        // Sem Range, a resposta da sonda já é o download (um GET só no link).
+        let first = body.filter(|_| !prepared.ranged);
 
         let spec = transfer::TransferSpec {
             id,
@@ -109,6 +111,7 @@ async fn drive(ctx: &JobCtx, id: DownloadId) -> Result<u64, TransferError> {
             cancel: ctx.cancel.clone(),
             max_retries: ctx.settings.max_retries,
             progress: ctx.progress.clone(),
+            first,
         };
         match transfer::run(spec).await {
             Ok(size) => return settle::finish(ctx, id, &resolved, &prepared.paths, size).await,
@@ -156,7 +159,8 @@ async fn resolve(
         attempt,
         captcha,
     };
-    let host = url.host_str().unwrap_or_default().to_owned();
+    // A mesma chave do agendador: o `classify` do plugin é achado por ela.
+    let host = ctx.host.clone();
     let resolved = tokio::select! {
         _ = ctx.cancel.cancelled() => return Err(TransferError::Cancelled),
         r = ctx.resolver.resolve(&req) => r,
@@ -183,7 +187,7 @@ async fn resolve(
         HostError::Unsupported => TransferError::Fatal("link não suportado".into()),
         e @ (HostError::BrowserRequired(_)
         | HostError::AccessDenied
-        | HostError::PremiumOnly
+        | HostError::PremiumOnly(_)
         | HostError::Account(_)) => TransferError::Fatal(e.to_string()),
         HostError::Captcha(challenge) => TransferError::Captcha(challenge),
     })

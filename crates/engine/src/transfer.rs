@@ -37,6 +37,8 @@ pub struct TransferSpec {
     pub cancel: CancellationToken,
     pub max_retries: u32,
     pub progress: Arc<JobProgress>,
+    /// Resposta inteira que a sonda já abriu (download sem Range).
+    pub first: Option<crate::probe::Body>,
 }
 
 /// Roda até completar, falhar ou ser cancelada. Devolve o tamanho final.
@@ -73,6 +75,7 @@ pub async fn run(spec: TransferSpec) -> Result<u64, TransferError> {
         cancel: cancel.clone(),
         max_retries: spec.max_retries,
         progress: spec.progress,
+        first: Mutex::new(spec.first),
     });
 
     let mut set = JoinSet::new();

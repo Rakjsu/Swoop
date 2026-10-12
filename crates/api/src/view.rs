@@ -18,7 +18,8 @@ pub struct DownloadView {
     /// traz o valor atual dos ativos).
     pub done_bytes: u64,
     pub error: Option<String>,
-    /// Até quando espera (ms Unix), quando `state` é `waiting`.
+    /// Até quando espera (ms Unix): em `waiting`, ou em `queued` quando o
+    /// servidor inteiro mandou esperar ("próximo download em N min").
     pub wait_until_ms: Option<i64>,
     pub final_path: Option<String>,
     /// Pacote do download (a lista agrupa por ele).
@@ -36,6 +37,9 @@ pub struct CaptchaInfo {
     pub host: String,
     /// Fim do contador do site (ms Unix); antes disso o envio espera.
     pub not_before_ms: i64,
+    /// Prazo do site para a resposta (ms Unix). Vencido, a interface mostra
+    /// "Captcha expirou" e oferece Recomeçar (`retry`).
+    pub expires_at_ms: Option<i64>,
 }
 
 /// Um link no coletor.
@@ -98,8 +102,13 @@ pub enum Notice {
     QueueFinished { completed: u32, failed: u32 },
     /// Um download falhou de vez (esgotou as tentativas ou erro sem volta).
     Failed { name: String, message: String },
-    /// Um servidor pediu captcha: o usuário resolve no app.
-    CaptchaNeeded { name: String, host: String },
+    /// Um servidor pediu captcha: o usuário resolve no app (até
+    /// `deadline_secs`, quando o site tem prazo).
+    CaptchaNeeded {
+        name: String,
+        host: String,
+        deadline_secs: Option<u64>,
+    },
 }
 
 /// Como um item saiu da fila.

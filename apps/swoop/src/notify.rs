@@ -39,9 +39,18 @@ fn text(notice: &Notice) -> (String, String) {
         Notice::Failed { name, message } => {
             ("Download falhou".into(), format!("{name}: {message}"))
         }
-        Notice::CaptchaNeeded { name, host } => (
+        Notice::CaptchaNeeded {
+            name,
+            host,
+            deadline_secs,
+        } => (
             "Captcha pendente".into(),
-            format!("{name} ({host}): clique em Resolver no Swoop"),
+            match deadline_secs {
+                Some(secs) => format!(
+                    "{name} ({host}): clique em Resolver no Swoop e resolva em até {secs} s"
+                ),
+                None => format!("{name} ({host}): clique em Resolver no Swoop"),
+            },
         ),
     }
 }

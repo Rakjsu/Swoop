@@ -65,11 +65,13 @@ pub struct Resolved {
 }
 
 impl Resolved {
-    /// Link direto sem restrições conhecidas (plugin `direct`).
+    /// Link direto sem restrições conhecidas (plugin `direct`). A chave do
+    /// servidor é o domínio sem `www.` (a mesma do agendador).
     pub fn direct(url: Url) -> Self {
         let host_key = url
             .host_str()
             .unwrap_or("desconhecido")
+            .trim_start_matches("www.")
             .to_ascii_lowercase();
         Self {
             url,

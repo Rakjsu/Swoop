@@ -34,6 +34,7 @@ fn challenge(url: &Url) -> CaptchaChallenge {
         fields: vec![("op".into(), "download2".into())],
         answer_field: "g-recaptcha-response".into(),
         not_before_ms: 0,
+        expires_at_ms: None,
     }
 }
 

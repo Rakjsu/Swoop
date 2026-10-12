@@ -79,7 +79,11 @@ async fn conferencia_da_conta() {
     let key = format!("127.0.0.1:{}", srv.addr().port());
     assert!(reg.accepts_account(&key));
     assert!(!reg.accepts_account("outro.example"));
-    assert_eq!(reg.account_hosts(), vec!["127.0.0.1".to_owned()]);
+    // o Rapidgator (origem das regras) também aceita conta
+    assert_eq!(
+        reg.account_hosts(),
+        vec!["rapidgator.net".to_owned(), "127.0.0.1".to_owned()]
+    );
 
     let premium = reg
         .account_info(&key, &account(AccountKind::ApiKey, "", KEY))

@@ -2,6 +2,7 @@
 //! usuário (`<dados>/rules/hosts.toml`) mesclado por cima, chave a chave.
 //! Assim um seletor ou endereço que mudou no site se corrige sem recompilar.
 
+pub use crate::rapidgator::RapidgatorRules;
 use serde::Deserialize;
 use std::path::Path;
 
@@ -19,6 +20,7 @@ pub struct Rules {
     pub mediafire: MediafireRules,
     pub gdrive: GdriveRules,
     pub xfs: XfsRules,
+    pub rapidgator: RapidgatorRules,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -74,8 +76,8 @@ pub struct XfsRules {
     /// Espera quando a página não mostra o contador de forma legível: o
     /// formulário final nunca sai antes disso.
     pub fallback_countdown_secs: u64,
-    /// Teto do contador aceito (segundos); acima disso é "espere até o
-    /// próximo download".
+    /// Teto do contador aceito (segundos). Acima dele a página é tratada
+    /// como não entendida (fica salva): nunca se envia antes da hora.
     pub max_countdown_secs: u64,
     /// "Você precisa esperar X horas, Y minutos, Z segundos".
     pub wait_pattern: String,
@@ -195,6 +197,8 @@ mod tests {
         assert_eq!(r.version, 1);
         assert_eq!(r.pixeldrain.max_connections, 1);
         assert!(r.gdrive.quota_wait_minutes > 0);
+        assert_eq!(r.rapidgator.free_max_active, 1);
+        assert!(r.rapidgator.captcha_deadline_secs > r.rapidgator.captcha_min_left_secs);
     }
 
     #[test]

@@ -11,4 +11,9 @@ host: string,
 /**
  * Fim do contador do site (ms Unix); antes disso o envio espera.
  */
-not_before_ms: number, };
+not_before_ms: number, 
+/**
+ * Prazo do site para a resposta (ms Unix). Vencido, a interface mostra
+ * "Captcha expirou" e oferece Recomeçar (`retry`).
+ */
+expires_at_ms: number | null, };

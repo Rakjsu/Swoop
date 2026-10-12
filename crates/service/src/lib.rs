@@ -14,6 +14,7 @@ mod paths;
 mod prefs;
 mod vault;
 
+pub use captcha::CAPTCHA_EXPIRED;
 pub use collector::Collector;
 pub use paths::{data_dir_from_env, default_data_dir, default_download_dir};
 
@@ -112,6 +113,7 @@ impl Service {
         let hosts = Arc::new(hosts.diagnostics_to(data_dir.join(DIAG_DIR)));
         let vault = vault::default_vault();
         accounts::load(&store, vault.as_ref(), &hosts.accounts()).await?;
+        links::rekey(&store, &hosts).await?;
         let engine = Engine::new(
             store.clone(),
             hosts.clone(),
@@ -155,8 +157,8 @@ impl Service {
         package_name: &str,
     ) -> Result<Vec<DownloadId>, ServiceError> {
         let urls = links::prepare(&self.hosts, links).await?;
-        let urls = urls.into_iter().map(String::from).collect();
-        let ids = links::enqueue(&self.store, &self.engine, urls, dest, package_name).await?;
+        let keyed = links::keyed(&self.hosts, &urls);
+        let ids = links::enqueue(&self.store, &self.engine, keyed, dest, package_name).await?;
         let _ = self.pushes.send(Push::Changed);
         Ok(ids)
     }
