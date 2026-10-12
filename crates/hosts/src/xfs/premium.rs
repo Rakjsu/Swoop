@@ -3,7 +3,8 @@
 //! próprio site (a URL com a chave nunca aparece em erro: `page::network`).
 
 use super::account::{self, Premium};
-use super::{now_ms, site_key};
+use super::site_key;
+use crate::flow::now_ms;
 use crate::page;
 use crate::plugin::HostCtx;
 use std::time::SystemTime;

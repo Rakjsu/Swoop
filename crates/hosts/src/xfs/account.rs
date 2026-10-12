@@ -112,7 +112,7 @@ pub fn premium_page(
     now: SystemTime,
 ) -> Result<Premium, HostError> {
     match parse::blocked(html, rules, now) {
-        Err(HostError::PremiumOnly | HostError::Wait { .. }) => return Err(not_premium(host)),
+        Err(HostError::PremiumOnly(_) | HostError::Wait { .. }) => return Err(not_premium(host)),
         other => other?,
     }
     let doc = Html::parse_document(html);

@@ -20,6 +20,7 @@ pub struct Shared {
     pub generation: Arc<AtomicU64>,
     pub requests: Arc<AtomicU64>,
     pub xfs: crate::xfs::XfsState,
+    pub rg: crate::rapidgator::RgState,
 }
 
 impl axum::extract::FromRef<Shared> for crate::xfs::XfsState {

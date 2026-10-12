@@ -163,7 +163,7 @@ fn removido_premium_e_cloudflare() {
     );
     assert_eq!(
         step(&fixture("fastfile_premium.html"), &page(), &rules(), T0),
-        Err(HostError::PremiumOnly)
+        Err(HostError::PremiumOnly(None))
     );
     assert!(matches!(
         step(&fixture("fastfile_cloudflare.html"), &page(), &rules(), T0),

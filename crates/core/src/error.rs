@@ -82,9 +82,10 @@ pub enum HostError {
     BrowserRequired(String),
     #[error("o arquivo é privado ou exige login")]
     AccessDenied,
-    /// Só contas premium baixam este arquivo (aba Contas).
-    #[error("o servidor só libera este arquivo para contas premium")]
-    PremiumOnly,
+    /// Só contas premium baixam este arquivo (aba Contas). A mensagem, se
+    /// houver, diz o motivo ("o grátis vai até 500 MB…").
+    #[error("{}", .0.as_deref().unwrap_or("o servidor só libera este arquivo para contas premium"))]
+    PremiumOnly(Option<String>),
     /// A conta do usuário foi recusada (chave/senha errada, premium vencido).
     /// A mensagem diz o servidor e o motivo.
     #[error("{0}")]

@@ -6,13 +6,13 @@ use crate::direct::{self, DirectResolver};
 use crate::dump::Dump;
 use crate::plugin::{FileInfo, HostCtx, HostPlugin};
 use crate::rules::Rules;
-use crate::{detect, gdrive, mediafire, pixeldrain, xfs};
+use crate::{detect, gdrive, mediafire, pixeldrain, rapidgator, xfs};
 use async_trait::async_trait;
 use std::path::PathBuf;
 use std::sync::Arc;
 use swoop_core::{
-    Account, AccountInfo, ErrorClass, HostError, HttpFailure, ResolveRequest, Resolved, Resolver,
-    default_classify,
+    Account, AccountInfo, ErrorClass, HostError, HostPolicy, HttpFailure, ResolveRequest, Resolved,
+    Resolver, default_classify,
 };
 use swoop_net::reqwest;
 use url::Url;
@@ -44,6 +44,8 @@ impl Registry {
                 Box::new(pixeldrain::Pixeldrain),
                 Box::new(mediafire::Mediafire),
                 Box::new(gdrive::Gdrive),
+                // Antes do XFS: um site XFS nunca reivindica /file/<id> do Rapidgator.
+                Box::new(rapidgator::Rapidgator),
                 Box::new(xfs::Xfs),
             ],
         })
@@ -90,7 +92,7 @@ impl Registry {
     /// Links num texto qualquer.
     pub fn detect(&self, text: &str) -> Vec<Url> {
         let r = &self.ctx.rules;
-        let hosts: Vec<&str> = [
+        let mut hosts: Vec<&str> = [
             &r.pixeldrain.hosts,
             &r.mediafire.hosts,
             &r.gdrive.hosts,
@@ -100,6 +102,9 @@ impl Registry {
         .flatten()
         .map(String::as_str)
         .collect();
+        for p in &self.plugins {
+            hosts.extend(p.detect_hosts(r));
+        }
         detect::detect(text, &hosts)
     }
 
@@ -170,6 +175,13 @@ impl Resolver for Registry {
             .find(|p| p.id() == host_key)
             .map_or_else(|| default_classify(failure), |p| p.classify(failure))
     }
+
+    fn host_policy(&self, host_key: &str) -> HostPolicy {
+        self.plugins
+            .iter()
+            .find_map(|p| p.host_policy(&self.ctx, host_key))
+            .unwrap_or_default()
+    }
 }
 
 #[cfg(test)]
@@ -214,5 +226,23 @@ mod tests {
     fn detecta_com_os_hosts_das_regras() {
         let urls = registry().detect("baixe em pixeldrain.com/u/xyz789 ou drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWx/view");
         assert_eq!(urls.len(), 2);
+    }
+
+    #[test]
+    fn rapidgator_em_qualquer_dominio_e_um_servidor_so() {
+        let r = registry();
+        let id = "0123456789abcdef0123456789abcdef";
+        let urls = r.detect(&format!(
+            "parte 1: rg.to/file/{id}/a.part1.rar.html parte 2: https://rapidgator.net/file/{id}"
+        ));
+        assert_eq!(urls.len(), 2);
+        for u in &urls {
+            assert_eq!(r.host_of(u), "rapidgator");
+            assert_eq!(r.host_key(u), "rapidgator");
+        }
+        let policy = r.host_policy("rapidgator");
+        assert_eq!(policy.max_active, Some(1));
+        assert!(!policy.ignore_host_waits);
+        assert_eq!(r.host_policy("exemplo.com"), HostPolicy::default());
     }
 }

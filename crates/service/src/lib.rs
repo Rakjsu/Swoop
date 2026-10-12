@@ -14,6 +14,7 @@ mod paths;
 mod prefs;
 mod vault;
 
+pub use captcha::CAPTCHA_EXPIRED;
 pub use collector::Collector;
 pub use paths::{data_dir_from_env, default_data_dir, default_download_dir};
 

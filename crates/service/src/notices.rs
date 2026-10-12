@@ -3,10 +3,10 @@
 //! a fila termina.
 
 use swoop_api::{Notice, Push};
-use swoop_core::DownloadId;
 use swoop_core::filename::file_name_from_url;
+use swoop_core::{CaptchaChallenge, DownloadId};
 use swoop_engine::EngineEvent;
-use swoop_store::{Store, downloads};
+use swoop_store::{Store, downloads, now_ms};
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::{RecvError, TryRecvError};
 use url::Url;
@@ -56,8 +56,12 @@ pub async fn forward(
                 }
                 EngineEvent::CaptchaNeeded(id) => {
                     let name = display_name(&store, id).await;
-                    let host = host_of(&store, id).await;
-                    let _ = tx.send(Push::Notice(Notice::CaptchaNeeded { name, host }));
+                    let (host, deadline_secs) = captcha_of(&store, id).await;
+                    let _ = tx.send(Push::Notice(Notice::CaptchaNeeded {
+                        name,
+                        host,
+                        deadline_secs,
+                    }));
                 }
                 _ => {}
             }
@@ -83,15 +87,27 @@ async fn queue_idle(store: &Store) -> bool {
     }
 }
 
-/// Domínio do link (para o aviso de captcha).
-async fn host_of(store: &Store, id: DownloadId) -> String {
+/// Domínio do link e segundos até o prazo do site (para o aviso de captcha).
+async fn captcha_of(store: &Store, id: DownloadId) -> (String, Option<u64>) {
     let row = store
         .call(move |c| downloads::get(c, id))
         .await
         .ok()
         .flatten();
-    row.and_then(|r| Url::parse(&r.url).ok()?.host_str().map(str::to_owned))
-        .unwrap_or_default()
+    let Some(row) = row else {
+        return (String::new(), None);
+    };
+    let host = Url::parse(&row.url)
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_owned))
+        .unwrap_or_default();
+    let deadline = row
+        .captcha
+        .as_deref()
+        .and_then(|j| serde_json::from_str::<CaptchaChallenge>(j).ok())
+        .and_then(|c| c.expires_at_ms)
+        .map(|t| ((t - now_ms()).max(0) / 1000) as u64);
+    (host, deadline)
 }
 
 /// Nome do arquivo para o aviso (sem o link inteiro, que pode ter chave).

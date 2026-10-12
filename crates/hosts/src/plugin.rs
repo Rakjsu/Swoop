@@ -7,7 +7,7 @@ use crate::rules::Rules;
 use async_trait::async_trait;
 use std::sync::Arc;
 use swoop_core::{
-    Account, AccountInfo, ErrorClass, HostError, HttpFailure, ResolveRequest, Resolved,
+    Account, AccountInfo, ErrorClass, HostError, HostPolicy, HttpFailure, ResolveRequest, Resolved,
     default_classify,
 };
 use swoop_net::reqwest;
@@ -92,6 +92,18 @@ pub trait HostPlugin: Send + Sync {
     /// O que fazer com uma falha HTTP durante o download.
     fn classify(&self, failure: &HttpFailure) -> ErrorClass {
         default_classify(failure)
+    }
+
+    /// Regras de agendamento do servidor `host_key`, se ele for deste
+    /// plugin (`None` = não é dele, ou só os limites gerais).
+    fn host_policy(&self, _ctx: &HostCtx, _host_key: &str) -> Option<HostPolicy> {
+        None
+    }
+
+    /// Domínios que o detector de links procura para este plugin (links
+    /// colados sem `https://`).
+    fn detect_hosts<'r>(&self, _rules: &'r Rules) -> Vec<&'r str> {
+        Vec::new()
     }
 
     /// Esta chave de servidor aceita conta premium neste plugin?

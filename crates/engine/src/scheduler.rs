@@ -1,15 +1,15 @@
 //! Agendador: acorda esperas vencidas e inicia downloads da fila respeitando
-//! o máximo de downloads simultâneos e de conexões por servidor.
+//! o máximo de downloads simultâneos, de conexões por servidor e as regras de
+//! cada servidor (`HostPolicy`: um por vez no grátis, esperas do servidor).
 
 use crate::engine::{Active, Inner};
 use crate::job::{self, EngineEvent, JobCtx};
 use crate::progress::JobProgress;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
-use swoop_core::{DownloadId, Event, Settings};
+use swoop_core::{CaptchaChallenge, DownloadId, Event, Settings};
 use swoop_store::{DownloadRow, downloads, host_state, now_ms};
-use url::Url;
 
 /// Sem avisos, o agendador ainda confere a fila neste intervalo (esperas).
 const TICK: Duration = Duration::from_millis(500);
@@ -41,20 +41,6 @@ fn reap(inner: &Inner) {
         .retain(|_, a| !a.handle.is_finished());
 }
 
-/// Chave de servidor de um download (a da resolução ou o domínio do link).
-fn host_of(row: &DownloadRow) -> String {
-    row.host_key.clone().unwrap_or_else(|| url_host(row))
-}
-
-/// Domínio do link, sem `www.` (a mesma chave que os plugins usam).
-fn url_host(row: &DownloadRow) -> String {
-    Url::parse(&row.url)
-        .ok()
-        .and_then(|u| u.host_str().map(str::to_ascii_lowercase))
-        .map(|h| h.trim_start_matches("www.").to_owned())
-        .unwrap_or_default()
-}
-
 /// Inicia o que couber.
 async fn fill(inner: &Arc<Inner>) -> Result<(), swoop_store::StoreError> {
     let woken = inner
@@ -68,22 +54,33 @@ async fn fill(inner: &Arc<Inner>) -> Result<(), swoop_store::StoreError> {
     if free_slots(inner, &settings) == 0 {
         return Ok(());
     }
-    let (queued, waiting) = inner
+    let (queued, waiting, pending) = inner
         .store
         .call(|c| {
             let waits = host_state::active(c, now_ms())?;
-            Ok((downloads::queued(c, QUEUE_PEEK)?, waits))
+            let pending = downloads::in_state(c, swoop_core::DownloadState::CaptchaNeeded)?;
+            Ok((downloads::queued(c, QUEUE_PEEK)?, waits, pending))
         })
         .await?;
     // Servidores que mandaram esperar antes do próximo download.
     let blocked: HashSet<String> = waiting.into_iter().map(|w| w.host_key).collect();
+    let held = captcha_held(&pending);
     for row in queued {
         if free_slots(inner, &settings) == 0 || inner.shutdown.is_cancelled() {
             break;
         }
-        let host = host_of(&row);
-        if blocked.contains(&host) || blocked.contains(&url_host(&row)) {
+        let host = row.server();
+        let policy = inner.resolver.host_policy(&host);
+        if !policy.ignore_host_waits
+            && (blocked.contains(&host) || blocked.contains(&row.url_server()))
+        {
             continue;
+        }
+        if let Some(max) = policy.max_active {
+            let busy = active_on(inner, &host) + held.get(&host).copied().unwrap_or(0);
+            if busy >= max {
+                continue;
+            }
         }
         let Some(grant) = grant_for(inner, &settings, &host, row.id) else {
             continue;
@@ -99,6 +96,30 @@ async fn fill(inner: &Arc<Inner>) -> Result<(), swoop_store::StoreError> {
         }
     }
     Ok(())
+}
+
+/// Downloads esperando o usuário resolver o captcha, ainda no prazo do site,
+/// por servidor: seguram a vaga do servidor (`max_active`), não a global.
+fn captcha_held(pending: &[DownloadRow]) -> HashMap<String, usize> {
+    let now = now_ms();
+    let mut held = HashMap::new();
+    for row in pending {
+        let expired = row
+            .captcha
+            .as_deref()
+            .and_then(|j| serde_json::from_str::<CaptchaChallenge>(j).ok())
+            .is_none_or(|c| c.expired(now));
+        if !expired {
+            *held.entry(row.server()).or_insert(0) += 1;
+        }
+    }
+    held
+}
+
+/// Downloads ativos do servidor.
+fn active_on(inner: &Inner, host: &str) -> usize {
+    let active = inner.active.lock().expect("mutex");
+    active.values().filter(|a| a.host == host).count()
 }
 
 /// Vagas de download livres.

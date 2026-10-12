@@ -42,12 +42,22 @@ pub struct CaptchaChallenge {
     pub answer_field: String,
     /// Não enviar antes disto (fim do contador do site), ms Unix.
     pub not_before_ms: i64,
+    /// Prazo do site para receber a resposta (ms Unix). Depois dele a
+    /// resposta nunca é enviada (o site pune envio atrasado); o usuário
+    /// recomeça o download.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_at_ms: Option<i64>,
 }
 
 impl CaptchaChallenge {
     /// Servidor do captcha, para mostrar na interface.
     pub fn host(&self) -> &str {
         self.page_url.host_str().unwrap_or("?")
+    }
+
+    /// O prazo do site já passou em `now_ms`?
+    pub fn expired(&self, now_ms: i64) -> bool {
+        self.expires_at_ms.is_some_and(|t| now_ms >= t)
     }
 }
 
@@ -83,11 +93,20 @@ mod tests {
             fields: vec![("op".into(), "download2".into())],
             answer_field: "g-recaptcha-response".into(),
             not_before_ms: 1_000,
+            expires_at_ms: None,
         };
         let json = serde_json::to_string(&c).unwrap();
         assert!(json.contains("\"type\":\"recaptcha2\""));
+        // desafio gravado antes do prazo existir ainda é lido
+        assert!(!json.contains("expires_at_ms"));
         assert_eq!(serde_json::from_str::<CaptchaChallenge>(&json).unwrap(), c);
         assert_eq!(c.host(), "fastfile.cc");
+        assert!(!c.expired(i64::MAX));
+        let timed = CaptchaChallenge {
+            expires_at_ms: Some(5_000),
+            ..c.clone()
+        };
+        assert!(!timed.expired(4_999) && timed.expired(5_000));
 
         let answer = CaptchaAnswer {
             challenge: c,

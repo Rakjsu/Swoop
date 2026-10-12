@@ -80,6 +80,7 @@ fn script(id: DownloadId, c: &CaptchaChallenge) -> String {
         "host": c.host(),
         "kind": c.kind,
         "render_at_ms": c.not_before_ms - RENDER_AHEAD_MS,
+        "expires_at_ms": c.expires_at_ms,
     });
     PAGE_JS.replacen("SWOOP_CFG", &cfg.to_string(), 1)
 }
@@ -122,10 +123,16 @@ mod tests {
             fields: vec![],
             answer_field: "code".into(),
             not_before_ms: 100_000,
+            expires_at_ms: None,
         };
         let js = script(DownloadId(3), &c);
         assert!(!js.contains("SWOOP_CFG"));
-        assert!(js.trim_end().ends_with(r#""render_at_ms":10000});"#));
+        assert!(
+            js.trim_end()
+                .ends_with(r#""render_at_ms":10000,"expires_at_ms":null});"#),
+            "{}",
+            &js[js.len() - 80..]
+        );
         assert!(js.contains(r#""html":"</script><script>alert(1)</script>\"'""#));
     }
 

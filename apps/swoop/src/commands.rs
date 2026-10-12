@@ -113,6 +113,12 @@ pub async fn solve_captcha(
         .await
         .map_err(ApiError::from)?
         .ok_or_else(|| ApiError::Invalid("esse download não está esperando captcha".into()))?;
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as i64);
+    if challenge.expired(now_ms) {
+        return Err(ApiError::Invalid(swoop_service::CAPTCHA_EXPIRED.into()));
+    }
     crate::captcha::open(&app, service.clone(), DownloadId(id), &challenge)
         .map_err(|e| ApiError::Internal(format!("não consegui abrir a janela do captcha: {e}")))
 }

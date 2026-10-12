@@ -3,6 +3,7 @@
 //! formulário `download2`) e a página final (link direto ou erro).
 
 use super::scan;
+pub use crate::form::Form;
 use crate::page::{self, human_size};
 use crate::rules::XfsRules;
 use regex::Regex;
@@ -27,25 +28,6 @@ pub fn code(url: &Url, rules: &XfsRules) -> Option<String> {
     let c = c.strip_suffix(".html").unwrap_or(c).to_ascii_lowercase();
     let re = Regex::new(&rules.code_pattern).ok()?;
     re.is_match(&c).then_some(c)
-}
-
-/// Formulário encontrado numa página: campos a enviar e destino.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Form {
-    pub fields: Vec<(String, String)>,
-    /// `action` do formulário; vazio = a própria página.
-    pub action: Option<String>,
-}
-
-impl Form {
-    /// Destino absoluto do formulário.
-    pub fn target(&self, page: &Url) -> Url {
-        self.action
-            .as_deref()
-            .filter(|a| !a.trim().is_empty())
-            .and_then(|a| page.join(a).ok())
-            .unwrap_or_else(|| page.clone())
-    }
 }
 
 /// O que a página pede agora.
@@ -159,7 +141,7 @@ pub(super) fn blocked(html: &str, rules: &XfsRules, now: SystemTime) -> Result<(
         return Err(HostError::Offline);
     }
     if has(&rules.premium_markers) {
-        return Err(HostError::PremiumOnly);
+        return Err(HostError::PremiumOnly(None));
     }
     if let Some(secs) = wait_secs(&lower, rules) {
         return Err(HostError::Wait {
@@ -185,27 +167,10 @@ fn wait_secs(lower: &str, rules: &XfsRules) -> Option<u64> {
 /// outros métodos, que o chamador decide).
 pub(super) fn form_with_op(doc: &Html, op: &str) -> Result<Option<Form>, HostError> {
     let forms = page::selector("form")?;
-    let inputs = page::selector("input[name]")?;
-    for form in doc.select(&forms) {
-        let fields: Vec<(String, String)> = form
-            .select(&inputs)
-            .filter(|i| {
-                !matches!(i.value().attr("type"), Some("submit" | "image" | "button"))
-                    || is_method(i)
-            })
-            .filter_map(|i| {
-                Some((
-                    i.value().attr("name")?.to_owned(),
-                    i.value().attr("value").unwrap_or("").to_owned(),
-                ))
-            })
-            .collect();
-        if fields.iter().any(|(k, v)| k == "op" && v == op) {
-            let action = form.value().attr("action").map(str::to_owned);
-            return Ok(Some(Form { fields, action }));
-        }
-    }
-    Ok(None)
+    Ok(doc
+        .select(&forms)
+        .map(|f| Form::read(f, is_method))
+        .find(|f| f.fields.iter().any(|(k, v)| k == "op" && v == op)))
 }
 
 /// Botões `method_*` também são campos no XFS (dizem qual download é).
@@ -241,24 +206,8 @@ fn captcha(
     page_url: &Url,
     rules: &XfsRules,
 ) -> Result<Option<(CaptchaKind, String)>, HostError> {
-    let key = |css: &str| page::attr(doc, css, "data-sitekey");
-    if let Some(site_key) = key(".g-recaptcha[data-sitekey]")? {
-        return Ok(Some((
-            CaptchaKind::Recaptcha2 { site_key },
-            "g-recaptcha-response".into(),
-        )));
-    }
-    if let Some(site_key) = key(".h-captcha[data-sitekey]")? {
-        return Ok(Some((
-            CaptchaKind::Hcaptcha { site_key },
-            "h-captcha-response".into(),
-        )));
-    }
-    if let Some(site_key) = key(".cf-turnstile[data-sitekey]")? {
-        return Ok(Some((
-            CaptchaKind::Turnstile { site_key },
-            "cf-turnstile-response".into(),
-        )));
+    if let Some(widget) = crate::flow::widget(doc)? {
+        return Ok(Some(widget));
     }
     if let Some(src) = page::attr(doc, &rules.image_captcha_selector, "src")?
         && let Ok(url) = page_url.join(&src)

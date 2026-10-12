@@ -10,10 +10,10 @@ use swoop_api::{
     AccountsView, ApiError, Backend, CaptchaInfo, CollectorView, Command, DownloadView,
     HistoryOutcome, HistoryView, Reply, Subscription,
 };
-use swoop_core::{CaptchaChallenge, DownloadId, Settings};
+use swoop_core::{CaptchaChallenge, DownloadId, DownloadState, Settings};
 use swoop_store::collector::CollectedRow;
 use swoop_store::history::HistoryRow;
-use swoop_store::{DownloadRow, StoreError, downloads, packages};
+use swoop_store::{DownloadRow, StoreError, downloads, host_state, now_ms, packages};
 
 /// Nome dos pacotes criados direto pela API (a janela passa pelo coletor).
 const PACKAGE_NAME: &str = "Links adicionados";
@@ -69,17 +69,30 @@ impl Backend for Service {
     }
 
     async fn list(&self) -> Result<Vec<DownloadView>, ApiError> {
-        let (rows, pkgs) = self
+        let (rows, pkgs, waits) = self
             .store
-            .call(|c| Ok((downloads::list(c)?, packages::list(c)?)))
+            .call(|c| {
+                let waits = host_state::waiting(c, now_ms())?;
+                Ok((downloads::list(c)?, packages::list(c)?, waits))
+            })
             .await
             .map_err(store)?;
         let names: HashMap<i64, String> = pkgs.into_iter().map(|p| (p.id.0, p.name)).collect();
+        let waits: HashMap<String, i64> = waits
+            .into_iter()
+            .map(|w| (w.host_key, w.wait_until))
+            .collect();
         Ok(rows
             .into_iter()
             .map(|r| {
                 let name = names.get(&r.package_id.0).cloned().unwrap_or_default();
-                view(r, name)
+                let host_wait = (r.state == DownloadState::Queued)
+                    .then(|| waits.get(&r.server()).or(waits.get(&r.url_server())))
+                    .flatten()
+                    .copied();
+                let mut v = view(r, name);
+                v.wait_until_ms = v.wait_until_ms.or(host_wait);
+                v
             })
             .collect())
     }
@@ -137,6 +150,7 @@ fn view(r: DownloadRow, package_name: String) -> DownloadView {
         .map(|c| CaptchaInfo {
             host: c.host().to_owned(),
             not_before_ms: c.not_before_ms,
+            expires_at_ms: c.expires_at_ms,
         });
     DownloadView {
         captcha,

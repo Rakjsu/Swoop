@@ -24,6 +24,7 @@ const PAUSABLE = new Set(['queued', 'resolving', 'downloading', 'verifying', 'wa
 /** Uma linha da lista: nome, tamanho, barra, velocidade, estado e ações. */
 export function DownloadRow({ row, live, canReveal, canSolve, onAction }: Props) {
   const { done, total } = progressOf(row, live);
+  const expired = captchaExpired(row);
   const pct = total ? Math.min(100, (done / total) * 100) : 0;
   const act = (action: RowAction) => () => onAction(action, row);
 
@@ -34,7 +35,7 @@ export function DownloadRow({ row, live, canReveal, canSolve, onAction }: Props)
           {displayName(row)}
         </span>
         <span className={row.error ? 'dl-sub dl-error' : 'dl-sub'}>
-          {row.error ?? subText(row, canSolve)}
+          {row.error ?? subText(row, canSolve, expired)}
         </span>
       </div>
       <div className="dl-size" role="cell">
@@ -50,7 +51,11 @@ export function DownloadRow({ row, live, canReveal, canSolve, onAction }: Props)
         {live && live.speed_bps > 0 ? formatSpeed(live.speed_bps) : ''}
       </div>
       <div className="dl-status" role="cell">
-        {row.state === 'captcha_needed' && canSolve ? (
+        {expired ? (
+          <button type="button" className="btn btn-primary btn-solve" onClick={act('retry')}>
+            Recomeçar
+          </button>
+        ) : row.state === 'captcha_needed' && canSolve ? (
           <button type="button" className="btn btn-primary btn-solve" onClick={act('captcha')}>
             Resolver captcha
           </button>
@@ -100,16 +105,25 @@ function statusText(row: DownloadView, live?: LiveRow): string {
   if (row.state === 'downloading' && live?.eta_secs != null) {
     return `${formatEta(live.eta_secs)} restantes`;
   }
-  if (row.state === 'waiting' && row.wait_until_ms) {
+  // Na fila com o servidor em espera ("próximo download em N min") também.
+  if ((row.state === 'waiting' || row.state === 'queued') && row.wait_until_ms) {
     const secs = Math.max(0, Math.round((row.wait_until_ms - Date.now()) / 1000));
     return `Aguardando ${formatEta(secs)}`;
   }
   return stateLabel(row.state);
 }
 
+/** Captcha pendente que passou do prazo do site (a resposta não vale mais). */
+function captchaExpired(row: DownloadView): boolean {
+  const until = row.captcha?.expires_at_ms;
+  return row.state === 'captcha_needed' && until != null && Date.now() >= until;
+}
+
 /** Linha de baixo: o site, e onde resolver o captcha pendente. */
-function subText(row: DownloadView, canSolve: boolean): string {
+function subText(row: DownloadView, canSolve: boolean, expired: boolean): string {
   const host = hostOf(row.url);
+  if (expired) return `${host}: o prazo do captcha acabou`;
+  if (row.state === 'queued' && row.wait_until_ms) return `${host}: limite do servidor`;
   if (row.state !== 'captcha_needed') return host;
   return canSolve ? `${host} pediu um captcha` : `${host} pediu um captcha: resolva no app do computador`;
 }

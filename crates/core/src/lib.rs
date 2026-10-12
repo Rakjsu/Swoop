@@ -30,7 +30,7 @@ pub use ids::{DownloadId, PackageId};
 pub use kind::{FileKind, file_kind};
 pub use link::LinkState;
 pub use resolved::{Integrity, RangeStyle, ResolveRequest, Resolved};
-pub use resolver::Resolver;
+pub use resolver::{HostPolicy, Resolver};
 pub use settings::Settings;
 pub use state::{DownloadState, Event, InvalidTransition};
 

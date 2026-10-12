@@ -12,7 +12,8 @@ export type DownloadView = { id: number, url: string, file_name: string | null, 
  */
 done_bytes: number, error: string | null, 
 /**
- * Até quando espera (ms Unix), quando `state` é `waiting`.
+ * Até quando espera (ms Unix): em `waiting`, ou em `queued` quando o
+ * servidor inteiro mandou esperar ("próximo download em N min").
  */
 wait_until_ms: number | null, final_path: string | null, 
 /**

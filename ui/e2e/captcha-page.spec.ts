@@ -26,8 +26,13 @@ test.afterAll(async () => {
 });
 
 /** Mesmo que o `script()` do Rust: a configuração no lugar de SWOOP_CFG. */
-async function openCaptcha(page: Page, kind: object, renderAtMs = 0): Promise<{ answer: Promise<URL> }> {
-  const cfg = { id: ID, host: '127.0.0.1', kind, render_at_ms: renderAtMs };
+async function openCaptcha(
+  page: Page,
+  kind: object,
+  renderAtMs = 0,
+  expiresAtMs: number | null = null,
+): Promise<{ answer: Promise<URL> }> {
+  const cfg = { id: ID, host: '127.0.0.1', kind, render_at_ms: renderAtMs, expires_at_ms: expiresAtMs };
   await page.addInitScript({ content: PAGE_JS.replace('SWOOP_CFG', JSON.stringify(cfg)) });
   const answer = new Promise<URL>((ok) => {
     void page.route('https://swoop-captcha.invalid/**', async (route) => {
@@ -96,4 +101,40 @@ test('contador longo: o widget só aparece perto do fim; Cancelar desiste', asyn
   const url = await answer;
   expect(url.pathname).toBe('/cancel');
   expect(url.searchParams.get('token')).toBeNull();
+});
+
+/** Turnstile falso: um botão que entrega o token (mesma API do oficial). */
+async function fakeTurnstile(page: Page) {
+  await page.route('https://challenges.cloudflare.com/turnstile/v0/api.js*', (route) =>
+    route.fulfill({
+      contentType: 'text/javascript',
+      body: `window.turnstile = { render(el, o) {
+        const b = document.createElement('button');
+        b.textContent = 'Verificar';
+        b.onclick = () => o.callback('cf+' + o.sitekey);
+        el.appendChild(b);
+      } };
+      window.swoopOnload();`,
+    }),
+  );
+}
+
+test('prazo do site: Turnstile dentro do prazo entrega o token', async ({ page }) => {
+  await fakeTurnstile(page);
+  const { answer } = await openCaptcha(page, { type: 'turnstile', site_key: '0x4AAAA-falsa' }, 0, Date.now() + 60_000);
+  await expect(page.getByText(/Resolva em até \d+ s/)).toBeVisible();
+  await page.getByRole('button', { name: 'Verificar' }).click();
+  expect((await answer).searchParams.get('token')).toBe('cf+0x4AAAA-falsa');
+});
+
+test('prazo do site vencido: a resposta nunca é enviada', async ({ page }) => {
+  await fakeTurnstile(page);
+  let sent = false;
+  const { answer } = await openCaptcha(page, { type: 'turnstile', site_key: 'k' }, 0, Date.now() + 1_500);
+  void answer.then(() => (sent = true));
+  await expect(page.getByRole('button', { name: 'Verificar' })).toBeVisible();
+  await expect(page.getByText(/O prazo do site acabou/)).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole('button', { name: 'Verificar' })).toHaveCount(0);
+  await page.waitForTimeout(300);
+  expect(sent).toBe(false);
 });

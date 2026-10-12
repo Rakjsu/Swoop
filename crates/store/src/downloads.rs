@@ -36,6 +36,23 @@ pub struct DownloadRow {
     pub captcha: Option<String>,
 }
 
+impl DownloadRow {
+    /// Chave do servidor: a gravada (plugin, ao adicionar ou resolver) ou o
+    /// domínio do link sem `www.`.
+    pub fn server(&self) -> String {
+        self.host_key.clone().unwrap_or_else(|| self.url_server())
+    }
+
+    /// Domínio do link sem `www.` (esperas gravadas antes da chave existir).
+    pub fn url_server(&self) -> String {
+        url::Url::parse(&self.url)
+            .ok()
+            .and_then(|u| u.host_str().map(str::to_ascii_lowercase))
+            .map(|h| h.trim_start_matches("www.").to_owned())
+            .unwrap_or_default()
+    }
+}
+
 /// O que a sonda descobriu sobre o arquivo.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProbeInfo {
@@ -126,6 +143,14 @@ pub fn queued(c: &Connection, limit: usize) -> Result<Vec<DownloadRow>, StoreErr
     );
     let mut stmt = c.prepare(&sql)?;
     let rows = stmt.query_map([limit as i64], from_row)?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
+/// Downloads num estado (ex.: os que esperam captcha), na ordem da fila.
+pub fn in_state(c: &Connection, state: DownloadState) -> Result<Vec<DownloadRow>, StoreError> {
+    let sql = format!("SELECT {COLUMNS} FROM downloads WHERE state = ?1 ORDER BY position");
+    let mut stmt = c.prepare(&sql)?;
+    let rows = stmt.query_map([state.as_str()], from_row)?;
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
