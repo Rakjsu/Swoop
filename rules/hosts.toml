@@ -192,7 +192,7 @@ api_wait_minutes = 5
 api_bad_login_markers = ["wrong e-mail or password", "error e-mail or password", "login or password is wrong", "password cannot be blank", "parameter login or password is missing"]
 api_unusual_ip_markers = ["unusual ip"]
 api_2fa_markers = ["auth code", "two-factor", "2fa"]
-api_locked_markers = ["frozen", "locked"]
+api_locked_markers = ["user is frozen", "account is frozen", "account locked", "account is locked"]
 traffic_wait_minutes = 60
 # `file.mode_label` de arquivo pago/só de assinantes (minúsculas) [S].
 paid_markers = ["paid", "subscri"]

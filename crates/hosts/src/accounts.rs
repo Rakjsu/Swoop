@@ -20,6 +20,8 @@ pub struct Session {
 struct Book {
     accounts: HashMap<String, Account>,
     sessions: HashMap<String, Session>,
+    /// Conta recusada pelo site (senha errada, bloqueio): o motivo.
+    refused: HashMap<String, String>,
 }
 
 /// Contas por servidor, compartilhadas entre o serviço e os plugins.
@@ -46,12 +48,36 @@ impl Accounts {
         let mut b = self.book.write().expect("contas");
         b.accounts.insert(host_key.to_owned(), account);
         b.sessions.remove(host_key);
+        b.refused.remove(host_key);
     }
 
     pub fn remove(&self, host_key: &str) {
         let mut b = self.book.write().expect("contas");
         b.accounts.remove(host_key);
         b.sessions.remove(host_key);
+        b.refused.remove(host_key);
+    }
+
+    /// Lembra que o site recusou a conta (até ela ser trocada).
+    pub fn refuse(&self, host_key: &str, username: &str, reason: &str) {
+        let mut b = self.book.write().expect("contas");
+        if b.accounts
+            .get(host_key)
+            .is_some_and(|a| a.username == username)
+        {
+            b.refused.insert(host_key.to_owned(), reason.to_owned());
+            b.sessions.remove(host_key);
+        }
+    }
+
+    /// Motivo da recusa da conta, se o site recusou.
+    pub fn refused(&self, host_key: &str) -> Option<String> {
+        self.book
+            .read()
+            .expect("contas")
+            .refused
+            .get(host_key)
+            .cloned()
     }
 
     /// Sessão aberta com a conta do servidor.
@@ -111,6 +137,11 @@ mod tests {
         a.set("rg", account("y"));
         assert!(a.session("rg").is_none());
         a.set_session("rg", "y", session());
+        a.refuse("rg", "y", "senha errada");
+        assert_eq!(a.refused("rg").as_deref(), Some("senha errada"));
+        assert!(a.session("rg").is_none(), "recusa derruba a sessão");
+        a.set("rg", account("y"));
+        assert!(a.refused("rg").is_none(), "conta trocada tenta de novo");
         a.remove("rg");
         assert!(a.session("rg").is_none() && a.get("rg").is_none());
     }

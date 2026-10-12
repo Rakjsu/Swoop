@@ -13,7 +13,8 @@ pub const CAPTCHA_EXPIRED: &str =
     "o prazo do site para este captcha acabou; clique em Recomeçar para pedir outro";
 
 impl Service {
-    /// Desafio pendente do download (`None` se não estiver esperando captcha).
+    /// Desafio pendente do download (`None` se não estiver esperando
+    /// captcha); passado o prazo do site, erro com o que fazer.
     pub async fn captcha_challenge(
         &self,
         id: DownloadId,
@@ -30,7 +31,11 @@ impl Service {
                 }
             })
             .await?;
-        Ok(json.and_then(|j| serde_json::from_str(&j).ok()))
+        let challenge: Option<CaptchaChallenge> = json.and_then(|j| serde_json::from_str(&j).ok());
+        if challenge.as_ref().is_some_and(|c| c.expired(now_ms())) {
+            return Err(ServiceError::BadInput(CAPTCHA_EXPIRED.into()));
+        }
+        Ok(challenge)
     }
 
     /// Resposta do usuário: guarda o token, devolve o download à fila e

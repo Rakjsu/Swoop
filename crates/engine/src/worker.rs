@@ -78,7 +78,12 @@ pub async fn run(ctx: Arc<WorkerCtx>, worker: WorkerId) -> Result<(), TransferEr
                 progressed,
             }) => {
                 release(&ctx, claim.idx);
-                failures = if progressed { 1 } else { failures + 1 };
+                // Sem Range a faixa recomeça do zero: "progresso" não conta.
+                failures = if progressed && ctx.ranged {
+                    1
+                } else {
+                    failures + 1
+                };
                 if failures > ctx.max_retries {
                     return Err(TransferError::Transient(format!(
                         "{message} (desistindo após {failures} tentativas)"
@@ -225,6 +230,11 @@ fn check_status(
         }
         let f = request::status_failure(status, resp.headers(), SystemTime::now());
         return classify(ctx, &f).map(Some);
+    }
+    if !ctx.ranged && crate::probe::page_instead_of_file(resp.headers(), &ctx.resolved) {
+        // Link de sessão já usado ou negado: resolver de novo, sem gravar a
+        // página no lugar do arquivo.
+        return Err(TransferError::Reresolve);
     }
     if ctx.ranged {
         let start = resp

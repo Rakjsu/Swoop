@@ -24,7 +24,8 @@ pub enum Command {
     Resume {
         id: i64,
     },
-    /// Nova tentativa de um download que falhou.
+    /// Nova tentativa de um download que falhou, ou Recomeçar um captcha
+    /// pendente que passou do prazo do site (`captcha_needed` → `queued`).
     Retry {
         id: i64,
     },

@@ -34,7 +34,7 @@ fn now_ms() -> i64 {
 #[async_trait]
 impl Resolver for OnePerHost {
     async fn resolve(&self, req: &ResolveRequest) -> Result<Resolved, HostError> {
-        if req.url.path() == "/captcha" {
+        if req.url.path() == "/captcha" && req.captcha.is_none() {
             return Err(HostError::Captcha(Box::new(CaptchaChallenge {
                 kind: CaptchaKind::Turnstile {
                     site_key: "chave".into(),
@@ -150,6 +150,72 @@ async fn captcha_no_prazo_segura_a_vaga_e_vencido_espera_o_usuario() {
             break;
         }
         assert!(t1.elapsed() < Duration::from_secs(5), "não recomeçou");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn fila_longa_de_um_servidor_nao_esconde_os_outros() {
+    let srv = TestServer::start().await.unwrap();
+    let h = harness(&srv).await;
+    for n in 0..205 {
+        h.add(format!("https://um.test/longa{n}")).await;
+    }
+    let other = h.add("https://outro.test/depois".into()).await;
+    let t0 = Instant::now();
+    while !busy(h.row(other).await.state) && h.row(other).await.state != DownloadState::Completed {
+        assert!(
+            t0.elapsed() < Duration::from_secs(5),
+            "o outro servidor ficou preso atrás da fila"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn captcha_respondido_no_prazo_tem_vaga_garantida() {
+    let srv = TestServer::start().await.unwrap();
+    let file = srv.file_url("NOME", &format!("size={}&seed=2&rate={}", 8 * MIB, MIB));
+    let mut s = settings(2);
+    s.max_active_downloads = 2;
+    let h = Harness::with_resolver(s, Arc::new(OnePerHost { file })).await;
+    let asked = h.add("https://um.test/captcha".into()).await;
+    let t0 = Instant::now();
+    while h.row(asked).await.state != DownloadState::CaptchaNeeded {
+        assert!(t0.elapsed() < Duration::from_secs(5), "não pediu captcha");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let others = [
+        h.add("https://outro.test/a".into()).await,
+        h.add("https://outro.test/b".into()).await,
+        h.add("https://outro.test/c".into()).await,
+    ];
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let mut running = 0;
+    for id in &others {
+        running += usize::from(busy(h.row(*id).await.state));
+    }
+    assert_eq!(running, 1, "a vaga do captcha pendente foi ocupada");
+
+    // resposta do usuário dentro do prazo: entra na hora, na vaga guardada
+    h.store
+        .call(move |c| {
+            swoop_store::downloads::transition(c, asked, swoop_core::Event::CaptchaSolved)?;
+            swoop_store::captcha::set_token(c, asked, "ok")
+        })
+        .await
+        .unwrap();
+    h.engine.wake();
+    let t1 = Instant::now();
+    while !matches!(
+        h.row(asked).await.state,
+        DownloadState::Downloading | DownloadState::Completed
+    ) {
+        assert!(
+            t1.elapsed() < Duration::from_secs(2),
+            "a resposta esperou vaga: {:?}",
+            h.row(asked).await.state
+        );
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
 }

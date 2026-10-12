@@ -155,3 +155,48 @@ async fn sem_range_o_link_e_pedido_uma_vez_so() {
     assert_eq!(stats.requests, 1, "o link foi pedido mais de uma vez");
     assert_eq!(stats.bytes_sent, size, "baixou mais que o arquivo");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn arquivo_json_esperado_baixa_normal() {
+    let srv = TestServer::start().await.unwrap();
+    let json = srv.file_url("dados.json", "size=4096&ctype=application/json");
+    let (row, calls, _) = run_links(vec![json]).await;
+    completed(&row);
+    assert_eq!(calls, 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sem_range_conexao_caida_e_pagina_na_volta_nao_vira_arquivo() {
+    // A 1ª resposta cai no meio; o mesmo link (de uso único) devolve página
+    // na volta. Nunca gravar a página como o arquivo, nem repetir o pedido
+    // sem parar (antes: 1 pedido por segundo para sempre).
+    let srv = TestServer::start().await.unwrap();
+    let url = srv.file_url(
+        "sessao.bin",
+        &format!("size={}&norange=1&drop_after=65536&page_from=1", 1 << 20),
+    );
+    let links = Arc::new(Links {
+        urls: vec![url],
+        calls: AtomicU32::new(0),
+    });
+    let h = Harness::with_resolver(settings(2), links.clone()).await;
+    let id = h.add("https://servidor.test/arquivo".into()).await;
+    let t0 = std::time::Instant::now();
+    while t0.elapsed() < Duration::from_secs(12) {
+        let row = h.row(id).await;
+        assert_ne!(
+            row.state,
+            swoop_core::DownloadState::Completed,
+            "a página virou o arquivo"
+        );
+        if row.state == swoop_core::DownloadState::Failed {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let requests = srv.stats().requests;
+    assert!(
+        requests < 10,
+        "pedidos demais no link de uso único: {requests}"
+    );
+}

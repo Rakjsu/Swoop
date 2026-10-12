@@ -18,13 +18,12 @@ mod rules;
 mod secret;
 
 use crate::page;
-use crate::plugin::{FileInfo, HostCtx, HostPlugin, MAX_FOLDER_DEPTH};
+use crate::plugin::{FileInfo, HostCtx, HostPlugin};
 use crate::rules::Rules;
 use async_trait::async_trait;
-use std::collections::HashSet;
 use std::time::{Duration, SystemTime};
 use swoop_core::{
-    Account, AccountInfo, AccountKind, HostError, HostPolicy, ResolveRequest, Resolved,
+    Account, AccountInfo, AccountKind, HostError, HostPolicy, ResolveRequest, Resolved, WaitReason,
 };
 use url::Url;
 
@@ -36,6 +35,16 @@ const HOST: &str = "rapidgator";
 
 pub struct Rapidgator;
 
+/// Pasta que não abriu quando o link foi adicionado.
+const FOLDER_AGAIN: &str = "é uma pasta do Rapidgator que não abriu ao adicionar; cole o link de novo para baixar os arquivos";
+
+/// A conta tem sessão premium aberta e no prazo?
+fn premium_now(ctx: &HostCtx, key: &str) -> bool {
+    ctx.accounts
+        .session(key)
+        .is_some_and(|s| s.premium && premium::valid(ctx, &s))
+}
+
 /// Chave da conta: o domínio da origem das regras (`rapidgator.net`, com a
 /// porta se houver), o mesmo que a aba Contas mostra.
 fn account_key(rules: &Rules) -> Option<String> {
@@ -45,46 +54,6 @@ fn account_key(rules: &Rules) -> Option<String> {
         Some(p) => format!("{host}:{p}"),
         None => host,
     })
-}
-
-/// Arquivos da pasta e das subpastas (até `MAX_FOLDER_DEPTH` níveis),
-/// página a página, com uma pausa entre as páginas.
-async fn expand_folder(ctx: &HostCtx, root: Url) -> Result<Vec<Url>, HostError> {
-    let rules = &ctx.rules.rapidgator;
-    let origin = free::origin(ctx)?;
-    let (mut files, mut seen) = (Vec::new(), HashSet::new());
-    let mut todo = vec![(root.clone(), 0)];
-    while let Some((dir, depth)) = todo.pop() {
-        if !seen.insert(dir.path().to_owned()) {
-            continue;
-        }
-        for n in 1..=rules.folder_max_pages {
-            let mut url = dir.clone();
-            if n > 1 {
-                url.query_pairs_mut().append_pair("page", &n.to_string());
-                tokio::time::sleep(Duration::from_millis(rules.folder_page_delay_ms)).await;
-            }
-            let page = page::get_from(ctx, &url, &origin, false, None).await?;
-            let listed = match folder::folder_page(page.status, &page.body, &page.url, rules) {
-                Ok(listed) => listed,
-                // subpasta que sumiu não derruba a pasta inteira
-                Err(HostError::Offline) if dir != root => break,
-                Err(e) => return Err(ctx.changed(HOST, "pasta", &page.body, e)),
-            };
-            for f in listed.files {
-                if !files.contains(&f) {
-                    files.push(f);
-                }
-            }
-            if depth < MAX_FOLDER_DEPTH {
-                todo.extend(listed.folders.into_iter().map(|u| (u, depth + 1)));
-            }
-            if n >= listed.last_page {
-                break;
-            }
-        }
-    }
-    Ok(files)
 }
 
 #[async_trait]
@@ -108,6 +77,14 @@ impl HostPlugin for Rapidgator {
             size: None,
         };
         let Some((_, file_url)) = parse::file_target(url, &ctx.rules.rapidgator) else {
+            // Pasta que não abriu ao adicionar: removida = offline; senão o
+            // usuário cola de novo para abrir os arquivos.
+            if let Some(dir) = parse::folder_target(url, &ctx.rules.rapidgator) {
+                let origin = free::origin(ctx)?;
+                let page = page::get_from(ctx, &dir, &origin, false, None).await?;
+                folder::folder_page(page.status, &page.body, &page.url, &ctx.rules.rapidgator)?;
+                return Err(HostError::BrowserRequired(FOLDER_AGAIN.into()));
+            }
             return Ok(none);
         };
         let origin = free::origin(ctx)?;
@@ -117,8 +94,9 @@ impl HostPlugin for Rapidgator {
         }
         let rules = &ctx.rules.rapidgator;
         match parse::blocked(first.status, &first.body, rules, SystemTime::now()) {
-            // Espera do grátis não quer dizer que o arquivo sumiu.
-            Err(HostError::Wait { .. }) | Ok(()) => {}
+            // Espera ou limite do grátis não quer dizer que o arquivo sumiu
+            // (com conta premium ele baixa; sem, o download diz o motivo).
+            Err(HostError::Wait { .. } | HostError::PremiumOnly(_)) | Ok(()) => {}
             Err(e) => return Err(e),
         }
         let (name, size) = parse::file_info(&first.body, rules)?;
@@ -126,20 +104,36 @@ impl HostPlugin for Rapidgator {
     }
 
     async fn resolve(&self, ctx: &HostCtx, req: &ResolveRequest) -> Result<Resolved, HostError> {
-        let (id, file_url) =
-            parse::file_target(&req.url, &ctx.rules.rapidgator).ok_or(HostError::Unsupported)?;
+        let Some((id, file_url)) = parse::file_target(&req.url, &ctx.rules.rapidgator) else {
+            return Err(
+                match parse::folder_target(&req.url, &ctx.rules.rapidgator) {
+                    Some(_) => HostError::BrowserRequired(FOLDER_AGAIN.into()),
+                    None => HostError::Unsupported,
+                },
+            );
+        };
         if let Some(key) = account_key(&ctx.rules)
             && let Some(acc) = ctx.accounts.get(&key)
-            && let Some(r) = premium::resolve(ctx, &key, &acc, &id, &file_url).await?
         {
-            return Ok(r);
+            // O agendador deixou entrar como premium (sem esperas): se a conta
+            // deixou de ser premium, volta para a fila em vez de ir pelo grátis.
+            let promised = premium_now(ctx, &key);
+            if let Some(r) = premium::resolve(ctx, &key, &acc, &id, &file_url).await? {
+                return Ok(r);
+            }
+            if promised {
+                return Err(HostError::Wait {
+                    until: SystemTime::now() + Duration::from_secs(60),
+                    reason: WaitReason::Backoff,
+                });
+            }
         }
         free::resolve(ctx, req, &file_url).await
     }
 
     async fn expand(&self, ctx: &HostCtx, url: &Url) -> Result<Option<Vec<Url>>, HostError> {
         match parse::folder_target(url, &ctx.rules.rapidgator) {
-            Some(folder) => Ok(Some(expand_folder(ctx, folder).await?)),
+            Some(dir) => Ok(Some(folder::expand(ctx, dir).await?)),
             None => Ok(None),
         }
     }
@@ -155,19 +149,16 @@ impl HostPlugin for Rapidgator {
         let Some(key) = account_key(&ctx.rules).filter(|k| ctx.accounts.get(k).is_some()) else {
             return Some(free);
         };
-        Some(match ctx.accounts.session(&key) {
+        Some(if premium_now(ctx, &key) {
             // premium não tem as esperas nem o "um por vez" do grátis
-            Some(s) if s.premium => HostPolicy {
+            HostPolicy {
                 max_active: None,
                 ignore_host_waits: true,
-            },
-            Some(_) => free,
-            // conta ainda sem login: um download entra para descobrir (se ela
-            // não for premium, o site mostra a espera de novo)
-            None => HostPolicy {
-                max_active: Some(1),
-                ignore_host_waits: true,
-            },
+            }
+        } else {
+            // conta grátis, sessão vencida ou ainda sem login: regras do
+            // grátis (o login acontece no primeiro download que entrar)
+            free
         })
     }
 

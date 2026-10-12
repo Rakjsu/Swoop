@@ -82,7 +82,10 @@ async fn contador_inteiro_captcha_e_link_de_sessao() {
     assert_eq!(c.answer_field, "DownloadCaptchaForm[verifyCode]");
     assert!(c.fields.iter().any(|(k, _)| k == "YII_CSRF_TOKEN"));
     let left = c.expires_at_ms.unwrap() - c.not_before_ms;
-    assert_eq!(left, 100_000, "prazo das regras");
+    assert_eq!(
+        left, 85_000,
+        "prazo do site (100 s) menos a folga do envio (15 s)"
+    );
     assert_eq!(c.page_url.path(), format!("/file/{ID}/Relatorio.rar.html"));
 
     let r = answer(&reg, &link, c, "ok")

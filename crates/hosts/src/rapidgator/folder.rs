@@ -1,10 +1,34 @@
-//! Rapidgator, pastas (parte pura): links de arquivos e de subpastas da
-//! página `/folder/<n>/<nome>.html` e a última página (`?page=N`).
+//! Rapidgator, pastas: links de arquivos e de subpastas da página
+//! `/folder/<n>/<nome>.html` e a última página (`?page=N`) — parte pura — e a
+//! leitura de todas as páginas e subpastas.
 
-use super::RapidgatorRules;
-use super::parse::regex;
+use super::parse::{blocked, regex};
+use super::{HOST, RapidgatorRules, free};
+use crate::page;
+use crate::plugin::{HostCtx, MAX_FOLDER_DEPTH};
+use std::collections::HashSet;
+use std::time::{Duration, SystemTime};
 use swoop_core::HostError;
 use url::Url;
+
+/// Link da página `n` da pasta (o `page` que veio no link colado sai).
+pub fn page_url(dir: &Url, n: u32) -> Url {
+    let keep: Vec<(String, String)> = dir
+        .query_pairs()
+        .filter(|(k, _)| k != "page")
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect();
+    let mut url = dir.clone();
+    url.set_query(None);
+    if !keep.is_empty() || n > 1 {
+        let mut q = url.query_pairs_mut();
+        q.extend_pairs(keep);
+        if n > 1 {
+            q.append_pair("page", &n.to_string());
+        }
+    }
+    url
+}
 
 /// O que uma página da pasta lista.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -44,6 +68,12 @@ pub fn folder_page(
     {
         return Err(HostError::Offline);
     }
+    // Cloudflare, limite, fora do ar: o motivo de sempre; outro erro HTTP
+    // nunca vira pasta vazia.
+    blocked(status, html, rules, SystemTime::now())?;
+    if status >= 400 {
+        return Err(HostError::Http(status));
+    }
     let me = page_url.path();
     let folders = links(html, page_url, &rules.folder_sub_pattern)?
         .into_iter()
@@ -60,6 +90,45 @@ pub fn folder_page(
         folders,
         last_page,
     })
+}
+
+/// Arquivos da pasta e das subpastas (até `MAX_FOLDER_DEPTH` níveis),
+/// página a página, com uma pausa entre as páginas.
+pub async fn expand(ctx: &HostCtx, root: Url) -> Result<Vec<Url>, HostError> {
+    let rules = &ctx.rules.rapidgator;
+    let origin = free::origin(ctx)?;
+    let (mut files, mut seen) = (Vec::new(), HashSet::new());
+    let mut todo = vec![(root.clone(), 0)];
+    while let Some((dir, depth)) = todo.pop() {
+        if !seen.insert(dir.path().to_owned()) {
+            continue;
+        }
+        for n in 1..=rules.folder_max_pages {
+            if n > 1 {
+                tokio::time::sleep(Duration::from_millis(rules.folder_page_delay_ms)).await;
+            }
+            let url = page_url(&dir, n);
+            let page = page::get_from(ctx, &url, &origin, false, None).await?;
+            let listed = match folder_page(page.status, &page.body, &page.url, rules) {
+                Ok(listed) => listed,
+                // subpasta que sumiu não derruba a pasta inteira
+                Err(HostError::Offline) if dir != root => break,
+                Err(e) => return Err(ctx.changed(HOST, "pasta", &page.body, e)),
+            };
+            for f in listed.files {
+                if !files.contains(&f) {
+                    files.push(f);
+                }
+            }
+            if depth < MAX_FOLDER_DEPTH {
+                todo.extend(listed.folders.into_iter().map(|u| (u, depth + 1)));
+            }
+            if n >= listed.last_page {
+                break;
+            }
+        }
+    }
+    Ok(files)
 }
 
 #[cfg(test)]
@@ -101,5 +170,20 @@ mod tests {
             folder_page(200, gone, &page, &rules),
             Err(HostError::Offline)
         );
+        // erro do site nunca vira pasta vazia
+        let err = folder_page(500, "<html>erro</html>", &page, &rules);
+        assert_eq!(err, Err(HostError::Http(500)));
+        let cf = folder_page(503, &fixture("cloudflare.html"), &page, &rules);
+        assert!(matches!(cf, Err(HostError::BrowserRequired(_))));
+    }
+
+    #[test]
+    fn pagina_n_troca_o_page_do_link() {
+        let dir = Url::parse("https://rapidgator.net/folder/4521/Colecao.html?page=3&x=1").unwrap();
+        let base = "https://rapidgator.net/folder/4521/Colecao.html";
+        assert_eq!(page_url(&dir, 1).as_str(), format!("{base}?x=1"));
+        assert_eq!(page_url(&dir, 2).as_str(), format!("{base}?x=1&page=2"));
+        let plain = Url::parse(base).unwrap();
+        assert_eq!(page_url(&plain, 1), plain);
     }
 }

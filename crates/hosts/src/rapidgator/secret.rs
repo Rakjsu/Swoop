@@ -10,14 +10,26 @@ static JSON: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"("(?:sid|token|session_id|email|download_url|url)"\s*:\s*")[^"]*""#)
         .expect("regex fixa")
 });
-/// Sessão na URL do link final.
-static QUERY: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(session_id=)[A-Za-z0-9_-]+").expect("regex fixa"));
+/// Sessão ou token numa URL citada no corpo (`?token=`, `?sid=`,
+/// `session_id=`, também escapada como `\/…?token=`).
+static QUERY: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?i)\b((?:token|sid|session_id)=)[^&"'\s<\\]+"#).expect("regex fixa")
+});
 
 /// Corpo sem sessão nem token.
 pub fn redact(body: &str) -> String {
     let body = JSON.replace_all(body, "${1}<oculto>\"");
     QUERY.replace_all(&body, "${1}<oculto>").into_owned()
+}
+
+/// Resposta de API ou do contador: JSON redigido; outra coisa (página de
+/// erro ou do Cloudflare, que pode repetir o pedido com o token codificado)
+/// não é gravada.
+pub fn redact_api(body: &str) -> String {
+    match serde_json::from_str::<serde_json::Value>(body.trim()) {
+        Ok(_) => redact(body),
+        Err(_) => format!("<resposta que não é JSON omitida: {} bytes>", body.len()),
+    }
 }
 
 #[cfg(test)]
@@ -34,5 +46,11 @@ mod tests {
         let page = "return 'https://pr1.rapidgator.net//?r=download/index&session_id=Xy9z';";
         assert!(!redact(page).contains("Xy9z"));
         assert!(redact(page).contains("session_id=<oculto>"));
+        let cf = r#"cUPMDTk:"\/api\/v2\/file\/download?token=SEGREDO&file_id=1", x:"?sid=SID9&a""#;
+        let out = redact(cf);
+        assert!(!out.contains("SEGREDO") && !out.contains("SID9"), "{out}");
+        let html = "<html>ru: 'L2FwaS92Mi9maWxlP3Rva2VuPVNFR1JFRE8='</html>";
+        assert!(!redact_api(html).contains("L2Fwa"));
+        assert!(redact_api(r#"{"sid":"x1"}"#).contains("<oculto>"));
     }
 }

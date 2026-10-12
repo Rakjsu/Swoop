@@ -51,9 +51,9 @@ async fn premium_sem_contador_com_md5_e_sessao_reaproveitada() {
     let reg = with_account(&srv, PREMIUM_USER, PASSWORD);
     assert!(reg.accepts_account(&key(&srv)));
     assert_eq!(reg.account_kinds(&key(&srv)), vec![AccountKind::Login]);
-    // conta ainda sem login: um download entra para descobrir
+    // conta ainda sem login: regras do grátis até o login dizer que é premium
     let p = reg.host_policy("rapidgator");
-    assert_eq!((p.max_active, p.ignore_host_waits), (Some(1), true));
+    assert_eq!((p.max_active, p.ignore_host_waits), (Some(1), false));
 
     let r = reg.resolve(&req(&srv, ID)).await.expect("link premium");
     assert!(r.url.path().starts_with("/premium/"));
@@ -91,11 +91,16 @@ async fn conta_conferida_e_recusas() {
     assert_eq!(info.traffic_left, Some(4_105_663_543_401));
 
     let bad = with_account(&srv, PREMIUM_USER, "errada");
-    let err = bad.resolve(&req(&srv, ID)).await.unwrap_err();
-    assert!(
-        matches!(&err, HostError::Account(m) if m.contains("senha")),
-        "{err:?}"
-    );
+    let logins = srv.rapidgator_stats().logins;
+    for _ in 0..3 {
+        let err = bad.resolve(&req(&srv, ID)).await.unwrap_err();
+        assert!(
+            matches!(&err, HostError::Account(m) if m.contains("senha")),
+            "{err:?}"
+        );
+    }
+    // recusa lembrada: um login só (logins errados repetidos bloqueiam a conta)
+    assert_eq!(srv.rapidgator_stats().logins, logins + 1);
 
     let paid = reg
         .resolve(&req(&srv, "ffff456789abcdef0123456789abcdef"))

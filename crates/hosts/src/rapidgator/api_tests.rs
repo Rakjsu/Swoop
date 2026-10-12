@@ -72,6 +72,16 @@ fn recusas_viram_erros_claros() {
         response(502, "<html>bad gateway</html>", &rules()),
         Err(Refused::Error(HostError::Changed(_)))
     ));
+    let locked = r#"{"response":null,"status":403,"details":"Error: ACCOUNT LOCKED FOR VIOLATION OF OUR TERMS. PLEASE CONTACT SUPPORT."}"#;
+    assert!(
+        matches!(response(200, locked, &rules()), Err(Refused::Error(HostError::Account(m))) if m.contains("bloqueou"))
+    );
+    // "blocked" de arquivo não é conta bloqueada
+    let file = r#"{"response":null,"status":404,"details":"Error: File is blocked"}"#;
+    assert_eq!(
+        response(200, file, &rules()),
+        Err(Refused::Error(HostError::Offline))
+    );
 }
 
 #[test]

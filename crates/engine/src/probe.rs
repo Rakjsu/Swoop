@@ -36,20 +36,40 @@ impl Probe {
 
 /// HTML ou JSON que não vem como anexo é página ou erro do site, não arquivo
 /// (`{"error":"Denied by IP"}`); um `.rar` mandado com `text/html` mas como
-/// anexo continua valendo.
-fn is_page(content_type: Option<&str>, disposition: Option<&str>) -> bool {
-    let html = content_type.is_some_and(|t| {
-        let t = t.trim_start().to_ascii_lowercase();
-        ["text/html", "application/xhtml", "application/json"]
-            .iter()
-            .any(|p| t.starts_with(p))
-    });
+/// anexo continua valendo, e um `.json` esperado como JSON também.
+fn is_page(content_type: Option<&str>, disposition: Option<&str>, expected: &str) -> bool {
+    let essence = content_type
+        .and_then(|t| t.split(';').next())
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase();
+    let json_file = [".json", ".jsonl", ".ndjson", ".geojson"]
+        .iter()
+        .any(|e| expected.to_ascii_lowercase().ends_with(e));
+    let page = essence.starts_with("text/html")
+        || essence.starts_with("application/xhtml")
+        || (essence == "application/json" && !json_file);
     let attachment = disposition.is_some_and(|d| {
         d.trim_start()
             .to_ascii_lowercase()
             .starts_with("attachment")
     });
-    html && !attachment
+    page && !attachment
+}
+
+/// A resposta é uma página no lugar do arquivo esperado do `resolved`?
+pub fn page_instead_of_file(headers: &header::HeaderMap, resolved: &Resolved) -> bool {
+    let text = |name| headers.get(name).and_then(|v| v.to_str().ok());
+    let expected = resolved
+        .file_name
+        .clone()
+        .or_else(|| swoop_core::filename::file_name_from_url(&resolved.url))
+        .unwrap_or_default();
+    is_page(
+        text(header::CONTENT_TYPE),
+        text(header::CONTENT_DISPOSITION),
+        &expected,
+    )
 }
 
 /// Resposta inteira (200) guardada para a transferência sem Range.
@@ -78,10 +98,7 @@ pub async fn probe(
         text(header::CONTENT_DISPOSITION).and_then(|v| swoop_net::parse_content_disposition(&v));
     let etag = text(header::ETAG);
     let last_modified = text(header::LAST_MODIFIED);
-    let page = is_page(
-        text(header::CONTENT_TYPE).as_deref(),
-        text(header::CONTENT_DISPOSITION).as_deref(),
-    );
+    let page = page_instead_of_file(headers, resolved);
 
     let probe = match status {
         StatusCode::PARTIAL_CONTENT => {

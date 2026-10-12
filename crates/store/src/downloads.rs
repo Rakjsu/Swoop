@@ -36,23 +36,6 @@ pub struct DownloadRow {
     pub captcha: Option<String>,
 }
 
-impl DownloadRow {
-    /// Chave do servidor: a gravada (plugin, ao adicionar ou resolver) ou o
-    /// domínio do link sem `www.`.
-    pub fn server(&self) -> String {
-        self.host_key.clone().unwrap_or_else(|| self.url_server())
-    }
-
-    /// Domínio do link sem `www.` (esperas gravadas antes da chave existir).
-    pub fn url_server(&self) -> String {
-        url::Url::parse(&self.url)
-            .ok()
-            .and_then(|u| u.host_str().map(str::to_ascii_lowercase))
-            .map(|h| h.trim_start_matches("www.").to_owned())
-            .unwrap_or_default()
-    }
-}
-
 /// O que a sonda descobriu sobre o arquivo.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProbeInfo {
@@ -65,12 +48,13 @@ pub struct ProbeInfo {
     pub part_path: PathBuf,
 }
 
-const COLUMNS: &str = "id, package_id, url, host_key, state, wait_until, wait_reason, error_kind,
+pub(crate) const COLUMNS: &str =
+    "id, package_id, url, host_key, state, wait_until, wait_reason, error_kind,
     error_msg, attempts, file_name, size, done_bytes, resumable, etag, last_modified, part_path,
     final_path, position, started_at, finished_at, captcha";
 
 /// Converte uma linha do SELECT padrão.
-fn from_row(r: &Row<'_>) -> rusqlite::Result<DownloadRow> {
+pub(crate) fn from_row(r: &Row<'_>) -> rusqlite::Result<DownloadRow> {
     let state: String = r.get(4)?;
     let wait_reason: Option<String> = r.get(6)?;
     Ok(DownloadRow {
@@ -120,38 +104,6 @@ pub fn insert(
         ],
     )?;
     Ok(DownloadId(c.last_insert_rowid()))
-}
-
-/// Busca um download.
-pub fn get(c: &Connection, id: DownloadId) -> Result<Option<DownloadRow>, StoreError> {
-    let sql = format!("SELECT {COLUMNS} FROM downloads WHERE id = ?1");
-    Ok(c.query_row(&sql, [id.0], from_row).optional()?)
-}
-
-/// Todos os downloads na ordem da fila.
-pub fn list(c: &Connection) -> Result<Vec<DownloadRow>, StoreError> {
-    let sql = format!("SELECT {COLUMNS} FROM downloads ORDER BY position");
-    let mut stmt = c.prepare(&sql)?;
-    let rows = stmt.query_map([], from_row)?;
-    Ok(rows.collect::<Result<_, _>>()?)
-}
-
-/// Próximos da fila (estado `queued`), na ordem.
-pub fn queued(c: &Connection, limit: usize) -> Result<Vec<DownloadRow>, StoreError> {
-    let sql = format!(
-        "SELECT {COLUMNS} FROM downloads WHERE state = 'queued' ORDER BY position LIMIT ?1"
-    );
-    let mut stmt = c.prepare(&sql)?;
-    let rows = stmt.query_map([limit as i64], from_row)?;
-    Ok(rows.collect::<Result<_, _>>()?)
-}
-
-/// Downloads num estado (ex.: os que esperam captcha), na ordem da fila.
-pub fn in_state(c: &Connection, state: DownloadState) -> Result<Vec<DownloadRow>, StoreError> {
-    let sql = format!("SELECT {COLUMNS} FROM downloads WHERE state = ?1 ORDER BY position");
-    let mut stmt = c.prepare(&sql)?;
-    let rows = stmt.query_map([state.as_str()], from_row)?;
-    Ok(rows.collect::<Result<_, _>>()?)
 }
 
 /// Aplica um evento ao download e grava o novo estado (com efeitos colaterais
@@ -299,6 +251,16 @@ pub fn set_size(c: &Connection, id: DownloadId, size: u64) -> Result<(), StoreEr
     Ok(())
 }
 
+/// Troca a chave do servidor (links de antes de a chave ser gravada ao
+/// adicionar).
+pub fn set_host_key(c: &Connection, id: DownloadId, host_key: &str) -> Result<(), StoreError> {
+    c.execute(
+        "UPDATE downloads SET host_key = ?2 WHERE id = ?1",
+        params![id.0, host_key],
+    )?;
+    Ok(())
+}
+
 /// Tentativas seguidas sem progresso (para o limite de retentativas).
 pub fn set_attempts(c: &Connection, id: DownloadId, attempts: u32) -> Result<(), StoreError> {
     c.execute(
@@ -329,6 +291,10 @@ pub fn remove(c: &mut Connection, id: DownloadId) -> Result<Option<DownloadRow>,
     tx.commit()?;
     Ok(Some(row))
 }
+
+#[path = "downloads_read.rs"]
+mod read;
+pub use read::{get, in_state, list, queued, queued_after, queued_answered};
 
 #[cfg(test)]
 #[path = "downloads_tests.rs"]

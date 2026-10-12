@@ -113,6 +113,7 @@ impl Service {
         let hosts = Arc::new(hosts.diagnostics_to(data_dir.join(DIAG_DIR)));
         let vault = vault::default_vault();
         accounts::load(&store, vault.as_ref(), &hosts.accounts()).await?;
+        links::rekey(&store, &hosts).await?;
         let engine = Engine::new(
             store.clone(),
             hosts.clone(),

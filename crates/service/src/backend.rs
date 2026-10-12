@@ -10,7 +10,7 @@ use swoop_api::{
     AccountsView, ApiError, Backend, CaptchaInfo, CollectorView, Command, DownloadView,
     HistoryOutcome, HistoryView, Reply, Subscription,
 };
-use swoop_core::{CaptchaChallenge, DownloadId, DownloadState, Settings};
+use swoop_core::{CaptchaChallenge, DownloadId, DownloadState, Resolver, Settings};
 use swoop_store::collector::CollectedRow;
 use swoop_store::history::HistoryRow;
 use swoop_store::{DownloadRow, StoreError, downloads, host_state, now_ms, packages};
@@ -86,7 +86,9 @@ impl Backend for Service {
             .into_iter()
             .map(|r| {
                 let name = names.get(&r.package_id.0).cloned().unwrap_or_default();
-                let host_wait = (r.state == DownloadState::Queued)
+                // Mesma regra do agendador: premium não espera pelo grátis.
+                let respects = !self.hosts.host_policy(&r.server()).ignore_host_waits;
+                let host_wait = (r.state == DownloadState::Queued && respects)
                     .then(|| waits.get(&r.server()).or(waits.get(&r.url_server())))
                     .flatten()
                     .copied();

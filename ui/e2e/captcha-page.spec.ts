@@ -109,6 +109,7 @@ async function fakeTurnstile(page: Page) {
     route.fulfill({
       contentType: 'text/javascript',
       body: `window.turnstile = { render(el, o) {
+        window.swoopCb = o.callback;
         const b = document.createElement('button');
         b.textContent = 'Verificar';
         b.onclick = () => o.callback('cf+' + o.sitekey);
@@ -135,6 +136,8 @@ test('prazo do site vencido: a resposta nunca é enviada', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Verificar' })).toBeVisible();
   await expect(page.getByText(/O prazo do site acabou/)).toBeVisible({ timeout: 5_000 });
   await expect(page.getByRole('button', { name: 'Verificar' })).toHaveCount(0);
+  // o widget ainda pode chamar o callback depois do prazo: nada sai
+  await page.evaluate(() => (window as unknown as { swoopCb: (t: string) => void }).swoopCb('cf+tarde'));
   await page.waitForTimeout(300);
   expect(sent).toBe(false);
 });

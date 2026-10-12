@@ -16,7 +16,7 @@ use swoop_service::Service;
 use tauri::webview::NewWindowResponse;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
-/// Prefixo do rótulo das janelas de captcha (`captcha-<id>`).
+/// Prefixo do rótulo das janelas de captcha (`captcha-<id>-<desafio>`).
 const PREFIX: &str = "captcha-";
 /// Script que monta a página mínima.
 const PAGE_JS: &str = include_str!("page.js");
@@ -31,7 +31,9 @@ pub fn open(
     id: DownloadId,
     challenge: &CaptchaChallenge,
 ) -> tauri::Result<()> {
-    let label = format!("{PREFIX}{}", id.0);
+    // Um rótulo por desafio: depois de Recomeçar, "Resolver" abre o novo, não
+    // a janela do vencido.
+    let label = format!("{PREFIX}{}-{}", id.0, challenge.not_before_ms);
     for (other, window) in app.webview_windows() {
         if other == label {
             window.unminimize()?;
@@ -127,12 +129,9 @@ mod tests {
         };
         let js = script(DownloadId(3), &c);
         assert!(!js.contains("SWOOP_CFG"));
-        assert!(
-            js.trim_end()
-                .ends_with(r#""render_at_ms":10000,"expires_at_ms":null});"#),
-            "{}",
-            &js[js.len() - 80..]
-        );
+        // chaves em ordem alfabética (serde_json sem preserve_order)
+        assert!(js.trim_end().ends_with(r#""render_at_ms":10000});"#));
+        assert!(js.contains(r#""expires_at_ms":null"#));
         assert!(js.contains(r#""html":"</script><script>alert(1)</script>\"'""#));
     }
 

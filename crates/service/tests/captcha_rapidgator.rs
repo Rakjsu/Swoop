@@ -111,7 +111,7 @@ async fn um_por_vez_com_captcha_e_link_unico() {
     ];
     for (n, id) in ids.iter().enumerate() {
         let deadline = captcha_deadline(&mut sub).await.expect("aviso sem prazo");
-        assert!((95..=100).contains(&deadline), "{deadline}");
+        assert!((80..=85).contains(&deadline), "{deadline}");
         wait_state(&svc, *id, DownloadState::CaptchaNeeded, 10).await;
         // o captcha pendente segura a vaga do servidor: os outros esperam
         for other in &ids[n + 1..] {

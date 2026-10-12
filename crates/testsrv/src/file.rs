@@ -44,6 +44,14 @@ pub async fn serve(
         return (StatusCode::FORBIDDEN, "link expirado").into_response();
     }
     let n = st.requests.fetch_add(1, Ordering::SeqCst);
+    if k.page_from.is_some_and(|from| n >= from) {
+        // Link de sessão já usado: o site responde 200 com uma página.
+        return (
+            [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
+            "<html><body>Download session expired</body></html>",
+        )
+            .into_response();
+    }
     if k.fail > 0.0 && (n.wrapping_mul(2_654_435_761) % 1000) < (k.fail * 1000.0) as u64 {
         return (StatusCode::SERVICE_UNAVAILABLE, "falha simulada").into_response();
     }

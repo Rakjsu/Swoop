@@ -122,7 +122,7 @@ function captchaExpired(row: DownloadView): boolean {
 /** Linha de baixo: o site, e onde resolver o captcha pendente. */
 function subText(row: DownloadView, canSolve: boolean, expired: boolean): string {
   const host = hostOf(row.url);
-  if (expired) return `${host}: o prazo do captcha acabou`;
+  if (expired) return `${host}: Captcha expirou`;
   if (row.state === 'queued' && row.wait_until_ms) return `${host}: limite do servidor`;
   if (row.state !== 'captcha_needed') return host;
   return canSolve ? `${host} pediu um captcha` : `${host} pediu um captcha: resolva no app do computador`;
